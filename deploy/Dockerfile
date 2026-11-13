@@ -2,7 +2,9 @@
 FROM node:22.23-bookworm-slim AS deps
 WORKDIR /app
 RUN corepack enable
-COPY package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc ./
+# Docker workspace (allowBuilds + dangerouslyAllowAllBuilds); not the Sites storeDir policy file.
+COPY package.json pnpm-lock.yaml .npmrc ./
+COPY deploy/pnpm-workspace.docker.yaml ./pnpm-workspace.yaml
 RUN pnpm install --frozen-lockfile --prod=false
 
 FROM node:22.23-bookworm-slim AS builder
@@ -10,6 +12,8 @@ WORKDIR /app
 RUN corepack enable
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
+# Ensure builder also sees Docker workspace if any install/rebuild runs
+COPY deploy/pnpm-workspace.docker.yaml ./pnpm-workspace.yaml
 ENV NEXT_TELEMETRY_DISABLED=1
 RUN pnpm run build
 
