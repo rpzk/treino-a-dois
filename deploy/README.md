@@ -15,7 +15,7 @@ cd /opt/treino-a-dois   # app root containing package.json
 docker compose -f deploy/docker-compose.yml up -d --build
 ```
 
-App listens on `127.0.0.1:3000`. Point nginx at it with `nginx-fit.rphealthtech.com.conf`, then:
+App is published on host `127.0.0.1:3001` (container still listens on 3000; host 3000 is HealthCore). Point nginx at it with `nginx-fit.rphealthtech.com.conf`, then:
 
 ```bash
 certbot --nginx -d fit.rphealthtech.com
