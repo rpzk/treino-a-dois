@@ -28,4 +28,4 @@ O caminho legado ChatGPT Sites / Cloudflare D1 (vinext + `.openai/hosting.json`)
 - Tipagem: `pnpm run typecheck`
 - Regressão: `pnpm run test:training`
 
-Deploy no VPS: ver `deploy/` e `/cursor/stores/self/docs/deploy-fit-rphealhtech.md`.
+Deploy no VPS: ver `deploy/` e `/cursor/stores/self/docs/deploy-fit-rphealthtech.md`.

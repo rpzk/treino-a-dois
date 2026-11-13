@@ -6,7 +6,7 @@ Prefer **Docker Compose** on the Hostinger VPS. Alternative: copy the Next.js `s
 
 - Node.js `>=22.13` (only for non-Docker path)
 - Docker + Compose, or nginx + certbot
-- DNS `fit.rphealhtech.com` → VPS public IPv4 (A record) — confirm before applying
+- DNS `fit.rphealthtech.com` → VPS public IPv4 (A record) — confirm before applying
 
 ## Docker (recommended)
 
@@ -15,10 +15,10 @@ cd /opt/treino-a-dois   # app root containing package.json
 docker compose -f deploy/docker-compose.yml up -d --build
 ```
 
-App listens on `127.0.0.1:3000`. Point nginx at it with `nginx-fit.rphealhtech.com.conf`, then:
+App listens on `127.0.0.1:3000`. Point nginx at it with `nginx-fit.rphealthtech.com.conf`, then:
 
 ```bash
-certbot --nginx -d fit.rphealhtech.com
+certbot --nginx -d fit.rphealthtech.com
 ```
 
 SQLite lives in the named volume `treino-data` (`SQLITE_PATH=/app/data/training.sqlite`). Empty on first boot.
@@ -33,4 +33,4 @@ SQLite lives in the named volume `treino-data` (`SQLITE_PATH=/app/data/training.
 
 ## First workout sheet
 
-Open `https://fit.rphealhtech.com`, pick **Rafael** or **Ana Amélia**, go to **Treinos**, create the sheet. No seed data is shipped.
+Open `https://fit.rphealthtech.com`, pick **Rafael** or **Ana Amélia**, go to **Treinos**, create the sheet. No seed data is shipped.
