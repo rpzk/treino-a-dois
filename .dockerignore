@@ -17,7 +17,7 @@ data
 !README.md
 deploy/*.md
 examples
-.openai
+# Keep .openai/hosting.json — vite.config.ts imports it; next build typechecks vite.config.ts
 MANIFESTO-SHA256.txt
 CONTEUDO-DO-PACOTE.md
 PROMPT-PARA-O-CHATGPT.md
