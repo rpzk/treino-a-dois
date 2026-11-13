@@ -1,0 +1,18 @@
+[Unit]
+Description=Treino a Dois (Next.js)
+After=network.target
+
+[Service]
+Type=simple
+User=treino
+WorkingDirectory=/opt/treino-a-dois
+Environment=NODE_ENV=production
+Environment=PORT=3000
+Environment=HOSTNAME=127.0.0.1
+Environment=SQLITE_PATH=/var/lib/treino-a-dois/training.sqlite
+ExecStart=/usr/bin/node server.js
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

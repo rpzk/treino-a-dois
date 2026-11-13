@@ -1,0 +1,19 @@
+services:
+  treino:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+    container_name: treino-a-dois
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: "3000"
+      HOSTNAME: "0.0.0.0"
+      SQLITE_PATH: /app/data/training.sqlite
+    volumes:
+      - treino-data:/app/data
+    ports:
+      - "127.0.0.1:3000:3000"
+
+volumes:
+  treino-data:
