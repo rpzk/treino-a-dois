@@ -1,3 +1,4 @@
+import type { EquipmentItem } from "@/lib/equipment-inventory";
 import { exercises } from "@/lib/training";
 import { healthcoreAiComplete } from "@/lib/healthcore-ai";
 
@@ -92,11 +93,17 @@ export function parseSuggestedWorkout(raw: string): SuggestedWorkout {
 export async function suggestWorkout(input: {
   tenantSchema: string;
   focus?: string;
+  equipmentInventory?: EquipmentItem[];
 }): Promise<SuggestedWorkout> {
   const focus = (input.focus || "").trim().slice(0, 120);
   const catalog = exercises
     .map((ex) => `- ${ex.name} (${ex.group})`)
     .join("\n");
+  const inventory = input.equipmentInventory ?? [];
+  const equipmentHint =
+    inventory.length > 0
+      ? `Use apenas exercícios factíveis com o equipamento disponível: ${inventory.map((i) => i.label).join(", ")}.`
+      : "";
 
   const result = await healthcoreAiComplete({
     purpose: "fitcore.workout_suggest",
@@ -120,9 +127,12 @@ export async function suggestWorkout(input: {
           focus
             ? `Monte uma ficha focada em: ${focus}.`
             : "Monte uma ficha equilibrada para iniciante/intermediário (full body ou AB).",
+          equipmentHint,
           "Biblioteca:",
           catalog,
-        ].join("\n"),
+        ]
+          .filter(Boolean)
+          .join("\n"),
       },
     ],
   });

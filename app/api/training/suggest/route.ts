@@ -1,3 +1,4 @@
+import { normalizeEquipmentItems } from "@/lib/equipment-inventory";
 import { requireFitSession } from "@/lib/require-fit-session";
 import { suggestWorkout } from "@/lib/workout-suggest";
 
@@ -18,17 +19,24 @@ export async function POST(req: Request) {
   }
 
   let focus = "";
+  let equipmentInventory: ReturnType<typeof normalizeEquipmentItems> = [];
   try {
-    const body = (await req.json()) as { focus?: string };
+    const body = (await req.json()) as {
+      focus?: string;
+      equipment_inventory?: unknown;
+    };
     focus = typeof body.focus === "string" ? body.focus : "";
+    equipmentInventory = normalizeEquipmentItems(body.equipment_inventory);
   } catch {
     focus = "";
+    equipmentInventory = [];
   }
 
   try {
     const suggestion = await suggestWorkout({
       tenantSchema: auth.ctx.session.tenantSchema,
       focus,
+      equipmentInventory,
     });
     return Response.json(suggestion, {
       headers: { "Cache-Control": "no-store" },
