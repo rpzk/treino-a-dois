@@ -19,6 +19,7 @@
     "test:clinical-progress": "node --experimental-strip-types scripts/test-clinical-progress.mjs",
     "test:clinical-prompt": "node --experimental-strip-types scripts/test-clinical-prompt.mjs",
     "test:equipment-inventory": "node --experimental-strip-types scripts/test-equipment-inventory.mjs",
+    "test:prescribe-schema": "node --experimental-strip-types scripts/test-prescribe-schema.mjs",
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",
     "db:generate": "drizzle-kit generate",
     "sites:dev": "node scripts/run-framework.mjs dev",
