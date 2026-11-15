@@ -1,12 +1,16 @@
 import type { Metadata } from "next";
+import { DM_Sans } from "next/font/google";
 import "./globals.css";
 
+const dmSans = DM_Sans({
+  subsets: ["latin"],
+  variable: "--font-dm-sans",
+  display: "swap",
+});
+
 export const metadata: Metadata = {
-  title: "Treino a dois",
-  description: "Seus treinos, séries e descanso em um só lugar.",
-  other: {
-    "codex-preview": "development",
-  },
+  title: "FitCore · HealthCore",
+  description: "Seu espaço de treino no portal do paciente HealthCore.",
   icons: {
     icon: "/favicon.svg",
     shortcut: "/favicon.svg",
@@ -20,8 +24,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="pt-BR">
-      <body className="antialiased">{children}</body>
+    <html lang="pt-BR" className={dmSans.variable}>
+      <body className="antialiased font-sans">{children}</body>
     </html>
   );
 }
