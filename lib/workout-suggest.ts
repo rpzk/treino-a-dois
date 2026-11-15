@@ -1,6 +1,7 @@
-import type { EquipmentItem } from "@/lib/equipment-inventory";
-import { exercises } from "@/lib/training";
-import { healthcoreAiComplete } from "@/lib/healthcore-ai";
+import type { EquipmentItem } from "./equipment-inventory.ts";
+import { exercises } from "./training.ts";
+import { healthcoreAiComplete } from "./healthcore-ai.ts";
+import { applyHealthMode, type ClinicalContext } from "./clinical-context.ts";
 
 export type SuggestedItem = {
   name: string;
@@ -90,10 +91,22 @@ export function parseSuggestedWorkout(raw: string): SuggestedWorkout {
   return { name, items };
 }
 
+export function buildSuggestSystem(ctx?: ClinicalContext | null): string {
+  return applyHealthMode([
+    "Você é o assistente de fichas do FitCore (HealthCore).",
+    "Responda APENAS com um objeto JSON válido, sem markdown.",
+    'Formato: {"name":"string","items":[{"name":"string","sets":3,"reps":10,"rest":90}]}',
+    "Use somente nomes da biblioteca fornecida (copie o nome exatamente).",
+    "Sugira entre 4 e 8 exercícios, treino realista para academia.",
+    "Idioma: português do Brasil.",
+  ].join(" "), ctx);
+}
+
 export async function suggestWorkout(input: {
   tenantSchema: string;
   focus?: string;
   equipmentInventory?: EquipmentItem[];
+  clinicalContext?: ClinicalContext | null;
 }): Promise<SuggestedWorkout> {
   const focus = (input.focus || "").trim().slice(0, 120);
   const catalog = exercises
@@ -112,14 +125,7 @@ export async function suggestWorkout(input: {
     messages: [
       {
         role: "system",
-        content: [
-          "Você é o assistente de fichas do FitCore (HealthCore).",
-          "Responda APENAS com um objeto JSON válido, sem markdown.",
-          'Formato: {"name":"string","items":[{"name":"string","sets":3,"reps":10,"rest":90}]}',
-          "Use somente nomes da biblioteca fornecida (copie o nome exatamente).",
-          "Sugira entre 4 e 8 exercícios, treino realista para academia.",
-          "Idioma: português do Brasil.",
-        ].join(" "),
+        content: buildSuggestSystem(input.clinicalContext),
       },
       {
         role: "user",

@@ -1,4 +1,5 @@
 import { normalizeEquipmentItems } from "@/lib/equipment-inventory";
+import { fetchClinicalContextForSession } from "@/lib/clinical-context";
 import { requireFitSession } from "@/lib/require-fit-session";
 import { suggestWorkout } from "@/lib/workout-suggest";
 
@@ -33,8 +34,10 @@ export async function POST(req: Request) {
   }
 
   try {
+    const clinicalContext = await fetchClinicalContextForSession(auth.ctx.session);
     const suggestion = await suggestWorkout({
       tenantSchema: auth.ctx.session.tenantSchema,
+      clinicalContext,
       focus,
       equipmentInventory,
     });

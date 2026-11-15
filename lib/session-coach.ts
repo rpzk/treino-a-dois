@@ -1,4 +1,5 @@
 import { healthcoreAiComplete } from "./healthcore-ai.ts";
+import { applyHealthMode, type ClinicalContext } from "./clinical-context.ts";
 
 export type SessionCoachTip = {
   tip_technique: string;
@@ -15,6 +16,7 @@ export type SessionCoachInput = {
   previousKg?: number | null;
   previousReps?: number | null;
   setIndex?: number;
+  clinicalContext?: ClinicalContext | null;
 };
 
 const INVALID_JSON_MESSAGE = "Resposta da IA não é JSON válido.";
@@ -64,6 +66,19 @@ export function parseSessionCoachTip(raw: string): SessionCoachTip {
   return { tip_technique, tip_progression };
 }
 
+export function buildCoachSystem(ctx?: ClinicalContext | null): string {
+  return applyHealthMode([
+    "Você é o coach de sessão do FitCore (HealthCore).",
+    "Responda APENAS com JSON válido, sem markdown.",
+    'Formato: {"tip_technique":"string","tip_progression":"string"|null}',
+    "No máximo ~2 frases curtas no total (técnica + progressão).",
+    "tip_technique: uma frase curta de execução/postura (obrigatória).",
+    "tip_progression: uma frase curta de carga/reps se houver histórico; senão null.",
+    "Sem diagnóstico médico, sem PHI, sem inventar lesões.",
+    "Idioma: português do Brasil.",
+  ].join(" "), ctx);
+}
+
 export async function coachExercise(
   input: SessionCoachInput,
 ): Promise<SessionCoachTip> {
@@ -81,16 +96,7 @@ export async function coachExercise(
     messages: [
       {
         role: "system",
-        content: [
-          "Você é o coach de sessão do FitCore (HealthCore).",
-          "Responda APENAS com JSON válido, sem markdown.",
-          'Formato: {"tip_technique":"string","tip_progression":"string"|null}',
-          "No máximo ~2 frases curtas no total (técnica + progressão).",
-          "tip_technique: uma frase curta de execução/postura (obrigatória).",
-          "tip_progression: uma frase curta de carga/reps se houver histórico; senão null.",
-          "Sem diagnóstico médico, sem PHI, sem inventar lesões.",
-          "Idioma: português do Brasil.",
-        ].join(" "),
+        content: buildCoachSystem(input.clinicalContext),
       },
       {
         role: "user",

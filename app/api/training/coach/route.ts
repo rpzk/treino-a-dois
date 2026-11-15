@@ -1,3 +1,4 @@
+import { fetchClinicalContextForSession } from "@/lib/clinical-context";
 import { requireFitSession } from "@/lib/require-fit-session";
 import { coachExercise } from "@/lib/session-coach";
 
@@ -39,8 +40,10 @@ export async function POST(req: Request) {
   }
 
   try {
+    const clinicalContext = await fetchClinicalContextForSession(auth.ctx.session);
     const tip = await coachExercise({
       tenantSchema: auth.ctx.session.tenantSchema,
+      clinicalContext,
       exerciseName,
       group: typeof body.group === "string" ? body.group : undefined,
       sets: Number(body.sets) || 3,

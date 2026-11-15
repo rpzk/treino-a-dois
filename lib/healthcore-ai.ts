@@ -11,7 +11,7 @@ export type HealthcoreAiCompleteResult = {
   purpose: string;
 };
 
-function exchangeSecret(): string {
+export function exchangeSecret(): string {
   const secret = process.env.FITCORE_EXCHANGE_SECRET?.trim() || "";
   if (!secret) {
     throw new Error("FITCORE_EXCHANGE_SECRET missing");
@@ -19,7 +19,7 @@ function exchangeSecret(): string {
   return secret;
 }
 
-function defaultIssuer(): string {
+export function defaultIssuer(): string {
   return (
     process.env.HEALTHCORE_PUBLIC_URL?.trim().replace(/\/$/, "") ||
     "https://rp.rphealthtech.com"
