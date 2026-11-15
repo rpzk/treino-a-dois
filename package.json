@@ -12,6 +12,7 @@
     "start": "next start --port 3000",
     "typecheck": "node node_modules/typescript/bin/tsc --noEmit",
     "test:training": "node --experimental-strip-types scripts/test-training.mjs",
+    "test:session-coach": "node --experimental-strip-types scripts/test-session-coach.mjs",
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",
     "db:generate": "drizzle-kit generate",
     "sites:dev": "node scripts/run-framework.mjs dev",
