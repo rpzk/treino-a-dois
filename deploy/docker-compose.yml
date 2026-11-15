@@ -11,6 +11,7 @@ services:
       HOSTNAME: "0.0.0.0"
       SQLITE_PATH: /app/data/training.sqlite
       FITCORE_PUBLIC_URL: ${FITCORE_PUBLIC_URL:-https://fit.rphealthtech.com}
+      HEALTHCORE_PUBLIC_URL: ${HEALTHCORE_PUBLIC_URL:-https://rp.rphealthtech.com}
       FITCORE_EXCHANGE_SECRET: ${FITCORE_EXCHANGE_SECRET}
       FITCORE_SESSION_SECRET: ${FITCORE_SESSION_SECRET:-${FITCORE_EXCHANGE_SECRET}}
     volumes:
