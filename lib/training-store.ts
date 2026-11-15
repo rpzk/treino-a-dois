@@ -53,7 +53,18 @@ async function bootstrap(p: Pool): Promise<void> {
   try {
     await client.query("BEGIN");
     await client.query("SELECT pg_advisory_xact_lock($1)", [BOOTSTRAP_LOCK_KEY]);
-    await client.query(BOOTSTRAP_SQL);
+    try {
+      await client.query(BOOTSTRAP_SQL);
+    } catch (error) {
+      // DML-only roles (e.g. fitcore_app) cannot CREATE SCHEMA/TABLE.
+      // If the schema was provisioned by migrations/superuser, continue.
+      const code =
+        error && typeof error === "object" && "code" in error
+          ? String((error as { code?: string }).code)
+          : "";
+      if (code !== "42501") throw error;
+      await client.query("SELECT 1 FROM fitcore.profiles LIMIT 0");
+    }
     await client.query("COMMIT");
   } catch (error) {
     await client.query("ROLLBACK").catch(() => undefined);
