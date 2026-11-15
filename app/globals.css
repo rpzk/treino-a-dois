@@ -189,3 +189,4 @@ button.portal-link:hover{background:#f5efe6}
 .equip-actions{display:flex;flex-wrap:wrap;gap:10px;justify-content:flex-end}
 .equip-actions button,.equip-add button{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:44px}
 @media(max-width:640px){.equip-actions{flex-direction:column-reverse}.equip-actions button{width:100%}.equip-thumbs{grid-template-columns:repeat(2,1fr)}}
+.prescribed-badge{display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin:-8px 0 10px}.prescribed-badge .outline-tag{color:#236b4e;border-color:#bce3cf;background:#eff8f3;font-weight:600}.patient-edited{color:#475569;font-size:12px}
