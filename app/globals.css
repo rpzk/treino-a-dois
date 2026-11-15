@@ -149,3 +149,16 @@
 .together-bar{display:none!important}
 .profile-control .profile-select{display:none}
 @media(max-width:640px){.topbar{padding:10px 16px}.app-shell main{padding:22px 16px 36px}}
+.coach-tip{
+  margin:10px 12px 14px;
+  padding:12px 14px;
+  border-radius:12px;
+  border:1px solid #bce3cf;
+  background:#eff8f3;
+  display:grid;
+  gap:8px;
+}
+.coach-tip-head{display:flex;align-items:center;justify-content:space-between}
+.coach-tip p{color:#1e293b;font-size:14px;line-height:1.45}
+.coach-tip-progress{opacity:.9}
+.coach-tip-btn{display:inline-flex;align-items:center;gap:6px;padding:6px 10px;font-size:13px}
