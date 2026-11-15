@@ -3,6 +3,7 @@ import path from "node:path";
 import { DatabaseSync, type SQLInputValue } from "node:sqlite";
 
 import { profileKeyForPatient } from "@/lib/training-profile";
+import type { StoredProfile } from "@/lib/training-store";
 
 export { isValidTrainingProfileId } from "@/lib/training-profile";
 
@@ -71,6 +72,116 @@ const BLANK_STATE = JSON.stringify({
   timer: null,
 });
 
+/** True when training data lives in Postgres (`fitcore.profiles`); SQLite is local-dev only. */
+export function usePostgresStore(): boolean {
+  return Boolean(process.env.DATABASE_URL?.trim());
+}
+
+// Loaded lazily so SQLite-only environments never import `pg`.
+async function pgStore(): Promise<typeof import("@/lib/training-store")> {
+  return import("@/lib/training-store");
+}
+
+export type TrainingOwner = {
+  /** Required for Postgres; ignored by the SQLite dev fallback. */
+  tenantSchema?: string | null;
+  patientFhirId: string;
+};
+
+const FHIR_ID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+
+function pgKey(owner: TrainingOwner): { tenantSchema: string; patientFhirId: string } {
+  const tenantSchema = (owner.tenantSchema || "").trim();
+  if (!tenantSchema) throw new Error("tenant_schema obrigatório");
+  return { tenantSchema, patientFhirId: owner.patientFhirId.trim().toLowerCase() };
+}
+
+async function getPgProfile(owner: TrainingOwner): Promise<StoredProfile | null> {
+  const { getProfileState } = await pgStore();
+  return getProfileState(pgKey(owner));
+}
+
+/** Profile id the client uses for this patient, or null when not provisioned. */
+export async function findLinkedProfile(owner: TrainingOwner): Promise<string | null> {
+  if (usePostgresStore()) {
+    const stored = await getPgProfile(owner);
+    return stored ? profileKeyForPatient(stored.patientFhirId) : null;
+  }
+  return findProfileByHealthcorePatientId(owner.patientFhirId);
+}
+
+export async function findLinkedDisplayName(owner: TrainingOwner): Promise<string | null> {
+  if (usePostgresStore()) {
+    const stored = await getPgProfile(owner);
+    return stored?.displayName?.trim() || null;
+  }
+  const profile = await findProfileByHealthcorePatientId(owner.patientFhirId);
+  return profile ? findDisplayNameByProfile(profile) : null;
+}
+
+export type TrainingSnapshot = {
+  profile: string;
+  state: unknown;
+  revision: number;
+};
+
+/** Current stored training state for the patient, or null when not provisioned. */
+export async function readTrainingState(
+  owner: TrainingOwner,
+): Promise<TrainingSnapshot | null> {
+  if (usePostgresStore()) {
+    const stored = await getPgProfile(owner);
+    if (!stored) return null;
+    return {
+      profile: profileKeyForPatient(stored.patientFhirId),
+      state: stored.state,
+      revision: stored.revision,
+    };
+  }
+  const profile = await findProfileByHealthcorePatientId(owner.patientFhirId);
+  if (!profile) return null;
+  const row = await database()
+    .prepare("SELECT data,revision FROM training WHERE profile=?")
+    .bind(profile)
+    .first<{ data: string; revision: number }>();
+  return {
+    profile,
+    state: row ? JSON.parse(row.data) : JSON.parse(BLANK_STATE),
+    revision: row?.revision ?? 0,
+  };
+}
+
+export type WriteTrainingResult =
+  | { revision: number }
+  | { conflict: true }
+  | { notFound: true };
+
+/** Compare-and-swap write of an already-validated state. */
+export async function writeTrainingState(
+  owner: TrainingOwner,
+  state: unknown,
+  expectedRevision: number,
+): Promise<WriteTrainingResult> {
+  if (usePostgresStore()) {
+    const { getProfileState, saveProfileState } = await pgStore();
+    const key = pgKey(owner);
+    // saveProfileState reports missing profile and stale revision identically.
+    if (!(await getProfileState(key))) return { notFound: true };
+    return saveProfileState(key, state as never, expectedRevision);
+  }
+  const profile = await findProfileByHealthcorePatientId(owner.patientFhirId);
+  if (!profile) return { notFound: true };
+  const result = await database()
+    .prepare(
+      "UPDATE training SET data=?,revision=revision+1 WHERE profile=? AND revision=?",
+    )
+    .bind(JSON.stringify(state), profile, expectedRevision)
+    .run();
+  return result.meta.changes === 1
+    ? { revision: expectedRevision + 1 }
+    : { conflict: true };
+}
+
 export async function findProfileByHealthcorePatientId(
   patientId: string,
 ): Promise<string | null> {
@@ -104,14 +215,33 @@ export type ProvisionResult = {
 
 /** Idempotent: link existing row or create hc_<uuid> profile for this patient. */
 export async function provisionProfileForPatient(input: {
+  tenantSchema: string;
   patientFhirId: string;
   displayName?: string | null;
 }): Promise<ProvisionResult> {
+  const tenantSchema = (input.tenantSchema || "").trim();
   const patientFhirId = input.patientFhirId.trim().toLowerCase();
-  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(patientFhirId)) {
+  if (!FHIR_ID_RE.test(patientFhirId)) {
     throw new Error("patient_fhir_id inválido");
   }
   const displayName = (input.displayName || "").trim().slice(0, 120) || null;
+
+  if (usePostgresStore()) {
+    if (!tenantSchema) throw new Error("tenant_schema inválido");
+    const { provisionProfile, getProfileState } = await pgStore();
+    const { created } = await provisionProfile({
+      tenantSchema,
+      patientFhirId,
+      displayName,
+    });
+    const stored = await getProfileState({ tenantSchema, patientFhirId });
+    return {
+      profile: profileKeyForPatient(patientFhirId),
+      patient_fhir_id: patientFhirId,
+      created,
+      display_name: stored?.displayName ?? displayName,
+    };
+  }
 
   const existing = await findProfileByHealthcorePatientId(patientFhirId);
   if (existing) {
@@ -149,6 +279,9 @@ export async function provisionProfileForPatient(input: {
 
 /** D1-shaped wrapper over Node's built-in SQLite for the training API routes. */
 export function database(): Database {
+  if (usePostgresStore()) {
+    throw new Error("SQLite database() is unavailable when DATABASE_URL is set");
+  }
   const db = getSqlite();
 
   return {

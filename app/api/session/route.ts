@@ -1,7 +1,4 @@
-import {
-  findDisplayNameByProfile,
-  findProfileByHealthcorePatientId,
-} from "@/lib/training-db";
+import { findLinkedDisplayName, findLinkedProfile } from "@/lib/training-db";
 import { readFitSessionFromRequest } from "@/lib/fit-session";
 
 export const runtime = "nodejs";
@@ -15,8 +12,8 @@ export async function GET(req: Request) {
       { status: 401, headers: { "Cache-Control": "no-store" } },
     );
   }
-  const profile = await findProfileByHealthcorePatientId(session.patientFhirId);
-  const displayName = profile ? await findDisplayNameByProfile(profile) : null;
+  const profile = await findLinkedProfile(session);
+  const displayName = profile ? await findLinkedDisplayName(session) : null;
   return Response.json(
     {
       authenticated: true,

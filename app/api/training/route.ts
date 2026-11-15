@@ -1,4 +1,8 @@
-import { database, isValidTrainingProfileId } from "@/lib/training-db";
+import {
+  isValidTrainingProfileId,
+  readTrainingState,
+  writeTrainingState,
+} from "@/lib/training-db";
 import { blank, stateSchema } from "@/lib/training";
 import {
   assertProfileAllowed,
@@ -17,14 +21,9 @@ export async function GET(req: Request) {
   if (denied) return denied;
 
   try {
-    const row = await database()
-      .prepare("SELECT data,revision FROM training WHERE profile=?")
-      .bind(profile)
-      .first<{ data: string; revision: number }>();
+    const row = await readTrainingState(auth.ctx.session);
     return Response.json(
-      row
-        ? { state: JSON.parse(row.data), revision: row.revision }
-        : { state: blank, revision: 0 },
+      row ? { state: row.state, revision: row.revision } : { state: blank, revision: 0 },
       { headers: { "Cache-Control": "no-store" } },
     );
   } catch (e) {
@@ -67,18 +66,21 @@ export async function PUT(req: Request) {
       return Response.json({ error: "Confira os campos do treino." }, { status: 400 });
     }
 
-    const db = database();
-    await db
-      .prepare("INSERT OR IGNORE INTO training(profile,data,revision) VALUES(?,?,0)")
-      .bind(input.profile, JSON.stringify(blank))
-      .run();
-    const result = await db
-      .prepare(
-        "UPDATE training SET data=?,revision=revision+1 WHERE profile=? AND revision=?",
-      )
-      .bind(JSON.stringify(parsed.data), input.profile, input.revision)
-      .run();
-    if (result.meta.changes !== 1) {
+    const result = await writeTrainingState(
+      auth.ctx.session,
+      parsed.data,
+      input.revision,
+    );
+    if ("notFound" in result) {
+      return Response.json(
+        {
+          error: "Perfil de treino ainda não vinculado a este paciente.",
+          code: "PROFILE_NOT_LINKED",
+        },
+        { status: 404 },
+      );
+    }
+    if ("conflict" in result) {
       return Response.json(
         {
           error:
@@ -87,7 +89,7 @@ export async function PUT(req: Request) {
         { status: 409 },
       );
     }
-    return Response.json({ revision: input.revision + 1 });
+    return Response.json({ revision: result.revision });
   } catch (e) {
     console.error(e);
     return Response.json(

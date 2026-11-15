@@ -1,4 +1,4 @@
-import { findProfileByHealthcorePatientId } from "@/lib/training-db";
+import { findLinkedProfile } from "@/lib/training-db";
 import { readFitSessionFromRequest, type FitSession } from "@/lib/fit-session";
 
 export type AuthedFitContext = {
@@ -19,7 +19,7 @@ export async function requireFitSession(
       ),
     };
   }
-  const profile = await findProfileByHealthcorePatientId(session.patientFhirId);
+  const profile = await findLinkedProfile(session);
   return { ok: true, ctx: { session, profile } };
 }
 

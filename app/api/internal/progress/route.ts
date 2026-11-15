@@ -1,5 +1,5 @@
 import { buildClinicalProgress } from "@/lib/clinical-progress";
-import { database, findProfileByHealthcorePatientId } from "@/lib/training-db";
+import { readTrainingState, usePostgresStore } from "@/lib/training-db";
 import { localDay } from "@/lib/training-stats";
 
 export const runtime = "nodejs";
@@ -32,13 +32,21 @@ export async function GET(req: Request) {
     return Response.json({ detail: "patient_fhir_id obrigatório." }, { status: 400 });
   }
 
+  const tenantSchema = (
+    new URL(req.url).searchParams.get("tenant_schema") || ""
+  ).trim();
+  if (usePostgresStore() && !tenantSchema) {
+    return Response.json({ detail: "tenant_schema obrigatório." }, { status: 400 });
+  }
+
   const todayDay = localDay(new Date().toISOString());
 
   try {
-    const profile = await findProfileByHealthcorePatientId(
-      patientFhirId.toLowerCase(),
-    );
-    if (!profile) {
+    const row = await readTrainingState({
+      tenantSchema,
+      patientFhirId: patientFhirId.toLowerCase(),
+    });
+    if (!row) {
       return Response.json(
         buildClinicalProgress({
           linked: false,
@@ -50,25 +58,18 @@ export async function GET(req: Request) {
       );
     }
 
-    const row = await database()
-      .prepare("SELECT data FROM training WHERE profile = ?")
-      .bind(profile)
-      .first<{ data: string }>();
-
     let sessions: Array<{ name: string; finished: string | null }> = [];
     let activeName: string | null = null;
 
-    if (row?.data) {
-      const parsed = JSON.parse(row.data) as {
-        sessions?: Array<{ name: string; finished?: string | null }>;
-        active?: { name?: string } | null;
-      };
-      sessions = (parsed.sessions ?? []).map((s) => ({
-        name: s.name,
-        finished: s.finished ?? null,
-      }));
-      activeName = parsed.active?.name?.trim() || null;
-    }
+    const parsed = row.state as {
+      sessions?: Array<{ name: string; finished?: string | null }>;
+      active?: { name?: string } | null;
+    };
+    sessions = (parsed.sessions ?? []).map((s) => ({
+      name: s.name,
+      finished: s.finished ?? null,
+    }));
+    activeName = parsed.active?.name?.trim() || null;
 
     return Response.json(
       buildClinicalProgress({

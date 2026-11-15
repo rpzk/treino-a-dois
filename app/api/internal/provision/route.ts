@@ -1,6 +1,10 @@
 import {
   provisionProfileForPatient,
+  usePostgresStore,
 } from "@/lib/training-db";
+
+/** Postgres schema-style identifier, e.g. clinica_rp. */
+const TENANT_SCHEMA_RE = /^[a-z_][a-z0-9_]{0,62}$/;
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -26,7 +30,7 @@ export async function POST(req: Request) {
     );
   }
 
-  let body: { patient_fhir_id?: string; display_name?: string };
+  let body: { patient_fhir_id?: string; tenant_schema?: string; display_name?: string };
   try {
     body = (await req.json()) as typeof body;
   } catch {
@@ -38,8 +42,17 @@ export async function POST(req: Request) {
     return Response.json({ detail: "patient_fhir_id obrigatório." }, { status: 400 });
   }
 
+  const tenantSchema = (body.tenant_schema || "").trim();
+  if (usePostgresStore() && !tenantSchema) {
+    return Response.json({ detail: "tenant_schema obrigatório." }, { status: 400 });
+  }
+  if (tenantSchema && !TENANT_SCHEMA_RE.test(tenantSchema)) {
+    return Response.json({ detail: "tenant_schema inválido." }, { status: 400 });
+  }
+
   try {
     const result = await provisionProfileForPatient({
+      tenantSchema,
       patientFhirId,
       displayName: body.display_name ?? null,
     });
