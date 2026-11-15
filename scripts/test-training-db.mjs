@@ -49,6 +49,15 @@ try {
   assert.equal(await db.findLinkedProfile(ownerA), expectedProfile);
   assert.equal(await db.findLinkedDisplayName(ownerA), "Alice");
 
+  const renamed = await db.provisionProfileForPatient({
+    tenantSchema: tenantA,
+    patientFhirId: fhir,
+    displayName: "Alice Souza",
+  });
+  assert.equal(renamed.created, false);
+  assert.equal(renamed.display_name, "Alice Souza");
+  assert.equal(await db.findLinkedDisplayName(ownerA), "Alice Souza");
+
   await assert.rejects(
     db.provisionProfileForPatient({ tenantSchema: tenantA, patientFhirId: "nope" }),
     /inválido/,

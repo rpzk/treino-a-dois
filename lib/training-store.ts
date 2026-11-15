@@ -178,5 +178,12 @@ export async function provisionProfile(input: {
     )
     .limit(1);
   if (!existing) throw new Error("provisionProfile: profile vanished after conflict");
+  // Parity with SQLite: a non-empty display name refreshes the stored one.
+  if (input.displayName) {
+    await d
+      .update(profiles)
+      .set({ displayName: input.displayName })
+      .where(eq(profiles.id, existing.id));
+  }
   return { profileId: existing.id, created: false };
 }
