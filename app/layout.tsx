@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { DM_Sans } from "next/font/google";
 import "./globals.css";
 
@@ -11,11 +11,23 @@ const dmSans = DM_Sans({
 export const metadata: Metadata = {
   title: "FitCore · HealthCore",
   description: "Seu espaço de treino no portal do paciente HealthCore.",
+  applicationName: "FitCore",
   icons: {
-    icon: "/favicon.svg",
+    icon: [
+      { url: "/favicon.svg", type: "image/svg+xml" },
+      { url: "/favicon-32.png", sizes: "32x32", type: "image/png" },
+    ],
     shortcut: "/favicon.svg",
     apple: [{ url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" }],
   },
+};
+
+export const viewport: Viewport = {
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#FAF6F0" },
+    { media: "(prefers-color-scheme: dark)", color: "#236B4E" },
+  ],
+  colorScheme: "light",
 };
 
 export default function RootLayout({
