@@ -1,21 +1,10 @@
+import { verifySecret } from "@/lib/exchange-secret";
 import { buildClinicalProgress } from "@/lib/clinical-progress";
 import { readTrainingState, usePostgresStore } from "@/lib/training-db";
 import { localDay } from "@/lib/training-stats";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-
-function verifySecret(req: Request): boolean {
-  const expected = process.env.FITCORE_EXCHANGE_SECRET?.trim() || "";
-  if (!expected) return false;
-  const provided = req.headers.get("x-fitcore-exchange-secret")?.trim() || "";
-  if (!provided || provided.length !== expected.length) return false;
-  let mismatch = 0;
-  for (let i = 0; i < expected.length; i++) {
-    mismatch |= expected.charCodeAt(i) ^ provided.charCodeAt(i);
-  }
-  return mismatch === 0;
-}
 
 export async function GET(req: Request) {
   if (!verifySecret(req)) {

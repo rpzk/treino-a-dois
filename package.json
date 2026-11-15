@@ -20,6 +20,7 @@
     "test:clinical-prompt": "node --experimental-strip-types scripts/test-clinical-prompt.mjs",
     "test:equipment-inventory": "node --experimental-strip-types scripts/test-equipment-inventory.mjs",
     "test:prescribe-schema": "node --experimental-strip-types scripts/test-prescribe-schema.mjs",
+    "test:prescribe-workout": "node --experimental-strip-types scripts/test-prescribe-workout.mjs",
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",
     "db:generate": "drizzle-kit generate",
     "sites:dev": "node scripts/run-framework.mjs dev",
