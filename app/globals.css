@@ -158,6 +158,7 @@
   display:grid;
   gap:8px;
 }
+.coach-tip .icon-button:hover{color:#1e293b;background:#dff0e6}
 .coach-tip-head{display:flex;align-items:center;justify-content:space-between}
 .coach-tip p{color:#1e293b;font-size:14px;line-height:1.45}
 .coach-tip-progress{opacity:.9}

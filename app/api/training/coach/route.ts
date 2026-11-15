@@ -53,14 +53,17 @@ export async function POST(req: Request) {
     });
     return Response.json(tip, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {
-    console.error(error);
+    // Log the real error server-side only; never leak upstream details to the client.
+    console.error("[training/coach]", error);
+    const message = error instanceof Error ? error.message : "";
+    if (/\(429\)|rate.?limit/i.test(message)) {
+      return Response.json(
+        { error: "Muitas dicas em pouco tempo, aguarde um minuto." },
+        { status: 429, headers: { "Retry-After": "60" } },
+      );
+    }
     return Response.json(
-      {
-        error:
-          error instanceof Error
-            ? error.message
-            : "Não foi possível gerar a dica. Tente novamente.",
-      },
+      { error: "Não foi possível gerar a dica agora. Tente de novo em instantes." },
       { status: 502 },
     );
   }

@@ -53,3 +53,6 @@ next-env.d.ts
 *.sqlite-journal
 *.sqlite-wal
 *.sqlite-shm
+
+# pnpm repo: never commit npm lockfile
+/package-lock.json

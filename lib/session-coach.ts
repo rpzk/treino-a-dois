@@ -17,41 +17,50 @@ export type SessionCoachInput = {
   setIndex?: number;
 };
 
+const INVALID_JSON_MESSAGE = "Resposta da IA não é JSON válido.";
+
 function extractJsonObject(raw: string): unknown {
-  const trimmed = raw.trim();
+  const trimmed = String(raw ?? "").trim();
   try {
     return JSON.parse(trimmed);
   } catch {
     const start = trimmed.indexOf("{");
     const end = trimmed.lastIndexOf("}");
     if (start >= 0 && end > start) {
-      return JSON.parse(trimmed.slice(start, end + 1));
+      try {
+        return JSON.parse(trimmed.slice(start, end + 1));
+      } catch {
+        throw new Error(INVALID_JSON_MESSAGE);
+      }
     }
-    throw new Error("Resposta da IA não é JSON válido.");
+    throw new Error(INVALID_JSON_MESSAGE);
   }
 }
 
 function clampText(value: unknown, max: number): string {
-  return String(value ?? "")
-    .trim()
-    .replace(/\s+/g, " ")
-    .slice(0, max);
+  if (typeof value !== "string") return "";
+  return value.trim().replace(/\s+/g, " ").slice(0, max);
 }
 
 export function parseSessionCoachTip(raw: string): SessionCoachTip {
-  const parsed = extractJsonObject(raw) as {
+  const root = extractJsonObject(raw);
+  if (!root || typeof root !== "object" || Array.isArray(root)) {
+    throw new Error(INVALID_JSON_MESSAGE);
+  }
+  const parsed = root as {
     tip_technique?: unknown;
     tip_progression?: unknown;
   };
+  if (typeof parsed.tip_technique !== "string") {
+    throw new Error("A dica veio sem frase de técnica.");
+  }
   const tip_technique = clampText(parsed.tip_technique, 220);
   if (!tip_technique) {
     throw new Error("A dica veio sem frase de técnica.");
   }
   const progRaw = parsed.tip_progression;
   const tip_progression =
-    progRaw === null || progRaw === undefined
-      ? null
-      : clampText(progRaw, 220) || null;
+    typeof progRaw === "string" ? clampText(progRaw, 220) || null : null;
   return { tip_technique, tip_progression };
 }
 
