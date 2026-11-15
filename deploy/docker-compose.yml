@@ -9,7 +9,10 @@ services:
       NODE_ENV: production
       PORT: "3000"
       HOSTNAME: "0.0.0.0"
+      # SQLite file is kept read-only-in-practice as a backup / migration source.
       SQLITE_PATH: /app/data/training.sqlite
+      # Postgres (shared HealthCore cluster). Host `db` resolves on healthcore_default.
+      DATABASE_URL: ${DATABASE_URL:?set DATABASE_URL in deploy/.env}
       FITCORE_PUBLIC_URL: ${FITCORE_PUBLIC_URL:-https://fit.rphealthtech.com}
       HEALTHCORE_PUBLIC_URL: ${HEALTHCORE_PUBLIC_URL:-https://rp.rphealthtech.com}
       FITCORE_EXCHANGE_SECRET: ${FITCORE_EXCHANGE_SECRET}
@@ -18,6 +21,13 @@ services:
       - treino-data:/app/data
     ports:
       - "127.0.0.1:3001:3000"
+    networks:
+      - healthcore
+
+networks:
+  healthcore:
+    name: healthcore_default
+    external: true
 
 volumes:
   treino-data:
