@@ -14,6 +14,7 @@
     "test:training": "node --experimental-strip-types scripts/test-training.mjs",
     "test:session-coach": "node --experimental-strip-types scripts/test-session-coach.mjs",
     "test:fit-session": "node --experimental-strip-types scripts/test-fit-session.mjs",
+    "test:clinical-progress": "node --experimental-strip-types scripts/test-clinical-progress.mjs",
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",
     "db:generate": "drizzle-kit generate",
     "sites:dev": "node scripts/run-framework.mjs dev",
