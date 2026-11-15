@@ -63,6 +63,8 @@ function Numeric({label,value,onChange,min=0,max=2000,step=1}:{label:string,valu
 export default function TrainingApp(){
  const [profile,setProfile]=useState<ProfileId>('lucas'),[data,setData]=useState<State>(blank),[revision,setRevision]=useState(0),[loading,setLoading]=useState(true),[busy,setBusy]=useState(false),[error,setError]=useState(''),[tab,setTab]=useState('workouts'),[edit,setEdit]=useState<Workout|null>(null),[detail,setDetail]=useState<Session|null>(null),[historyEdit,setHistoryEdit]=useState<Session|null>(null),[remove,setRemove]=useState<string|null>(null),[removeSession,setRemoveSession]=useState<string|null>(null),[finish,setFinish]=useState(false),[discard,setDiscard]=useState(false),[search,setSearch]=useState(''),[group,setGroup]=useState('all'),[tick,setTick]=useState(Date.now()),[dirty,setDirty]=useState(false),[reminderDismissed,setReminderDismissed]=useState(false);
  const [profileReady,setProfileReady]=useState(false);
+ const [sessionLocked,setSessionLocked]=useState(false);
+ const [sessionError,setSessionError]=useState('');
  const [exerciseOpen,setExerciseOpen]=useState<Record<string,boolean>>({});
  const audio=useRef<AudioContext|null>(null),notified=useRef<number|null>(null),lock=useRef(false),generation=useRef(0);
  const person=profileConfig[profile].name;
@@ -73,7 +75,17 @@ export default function TrainingApp(){
  const showCycleReminder=!reminderDismissed&&cycleDue(data.planCycleStartedAt,today);
  const cycleDays=data.planCycleStartedAt?elapsedCalendarDays(data.planCycleStartedAt,today):0;
  async function load(){const gen=++generation.current;setLoading(true);setError('');try{const r=await fetch(`/api/training?profile=${profile}`,{cache:'no-store'});const j=await r.json() as {state:State;revision:number;error:string};if(!r.ok)throw Error(j.error);if(gen!==generation.current)return;let state=j.state,rev=j.revision;if(!state.planCycleStartedAt||state.workouts.some(w=>!w.createdAt)||!state.workoutOrder){const migrated={...state,planCycleStartedAt:state.planCycleStartedAt??new Date().toISOString(),workouts:state.workouts.map(w=>({...w,createdAt:w.createdAt??legacyWorkoutCreatedAt})),workoutOrder:state.workoutOrder??initialWorkoutOrder(state.workouts)};const mr=await fetch('/api/training',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({profile,revision:rev,state:migrated})});if(mr.ok){const mj=await mr.json() as {revision:number};state=migrated;rev=mj.revision;}}if(gen!==generation.current)return;setData(state);setRevision(rev);setDirty(false);}catch(e){if(gen===generation.current)setError((e as Error).message);}finally{if(gen===generation.current)setLoading(false);}}
- useEffect(()=>{try{const saved=localStorage.getItem('treino-a-dois:profile');if(saved==='lucas'||saved==='natalia')setProfile(saved);}catch{}setProfileReady(true);},[]);
+ useEffect(()=>{(async()=>{
+  try{
+   const r=await fetch('/api/session',{cache:'no-store'});
+   if(r.status===401){setSessionError('Abra o FitCore pelo portal do paciente (HealthCore).');setProfileReady(false);return;}
+   const j=await r.json() as {profile:ProfileId|null;authenticated?:boolean};
+   if(j.profile==='lucas'||j.profile==='natalia'){setProfile(j.profile);setSessionLocked(true);try{localStorage.setItem('treino-a-dois:profile',j.profile);}catch{}}
+   else if(j.authenticated){setSessionError('Seu paciente ainda não tem perfil de treino vinculado. Peça à clínica para associar o FitCore.');setProfileReady(false);return;}
+   else {try{const saved=localStorage.getItem('treino-a-dois:profile');if(saved==='lucas'||saved==='natalia')setProfile(saved);}catch{}}
+  }catch{try{const saved=localStorage.getItem('treino-a-dois:profile');if(saved==='lucas'||saved==='natalia')setProfile(saved);}catch{}}
+  setProfileReady(true);
+ })();},[]);
  useEffect(()=>{if(profileReady)load();return()=>{generation.current++}},[profile,profileReady]);
  useEffect(()=>{
   document.documentElement.dataset.profile=profile;
@@ -85,7 +97,7 @@ export default function TrainingApp(){
   document.querySelectorAll<HTMLLinkElement>('link[rel="icon"], link[rel="shortcut icon"]').forEach(link=>{link.href=faviconHref});
   return()=>{delete document.documentElement.dataset.profile};
  },[profile]);
- function changeProfile(value:string){if(value!=='lucas'&&value!=='natalia')return;generation.current++;setLoading(true);setData(blank);setReminderDismissed(false);setProfile(value);try{localStorage.setItem('treino-a-dois:profile',value);}catch{}}
+ function changeProfile(value:string){if(sessionLocked)return;if(value!=='lucas'&&value!=='natalia')return;generation.current++;setLoading(true);setData(blank);setReminderDismissed(false);setProfile(value);try{localStorage.setItem('treino-a-dois:profile',value);}catch{}}
 
  useEffect(()=>{const id=setInterval(()=>setTick(Date.now()),250);return()=>clearInterval(id)},[]);
  useEffect(()=>{const fn=(e:BeforeUnloadEvent)=>{if(dirty||busy){e.preventDefault();e.returnValue='';}};window.addEventListener('beforeunload',fn);return()=>window.removeEventListener('beforeunload',fn)},[dirty,busy]);
@@ -119,7 +131,8 @@ export default function TrainingApp(){
   const active=data.active,total=active?.items.reduce((s,i)=>s+i.logs.length,0)??0,done=active?count(active):0,canFinishAtBottom=total>0&&done/total>=.75;
  const trainingProgress=active?summarizeProgress(active,null):null;
  const filtered=exercises.filter(x=>(group==='all'||x.group===group)&&x.name.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().includes(search.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase()));
- return <div className="app-shell"><Toaster theme={profile==='natalia'?'light':'dark'} position="top-center" richColors/><UpdateGate defer={!profileReady||loading||!!active||dirty||busy}/><header className="topbar"><a href="/" className="brand"><span className="brand-icon"><Dumbbell size={23}/></span>treino<span className="brand-light">a dois</span></a><div className="profile-control"><span className="profile-label">PERFIL</span><Select value={profile} onValueChange={changeProfile} disabled={busy||loading||dirty||!!edit||!!historyEdit}><SelectTrigger aria-label="Perfil de treino" className="profile-select"><SelectValue/></SelectTrigger><SelectContent><SelectItem value="lucas">{profileConfig.lucas.name}</SelectItem><SelectItem value="natalia">{profileConfig.natalia.name}</SelectItem></SelectContent></Select></div></header>
+ if(sessionError)return <div className="app-shell"><div className="p-6 max-w-lg mx-auto space-y-3"><h1 className="text-xl font-semibold">FitCore</h1><p className="text-sm opacity-80">{sessionError}</p><p className="text-sm opacity-70">Volte ao portal do paciente e use “Abrir sala de treino”.</p></div></div>;
+ return <div className="app-shell"><Toaster theme={profile==='natalia'?'light':'dark'} position="top-center" richColors/><UpdateGate defer={!profileReady||loading||!!active||dirty||busy}/><header className="topbar"><a href="/" className="brand"><span className="brand-icon"><Dumbbell size={23}/></span>Fit<span className="brand-light">Core</span></a><div className="profile-control"><span className="profile-label">PERFIL</span><Select value={profile} onValueChange={changeProfile} disabled={sessionLocked||busy||loading||dirty||!!edit||!!historyEdit}><SelectTrigger aria-label="Perfil de treino" className="profile-select"><SelectValue/></SelectTrigger><SelectContent><SelectItem value="lucas">{profileConfig.lucas.name}</SelectItem><SelectItem value="natalia">{profileConfig.natalia.name}</SelectItem></SelectContent></Select></div></header>
  <main><div className="page-heading"><div><p className="eyebrow">SEU ESPAÇO DE TREINO</p><h1>Vamos nessa, {person}<span className="lime">.</span></h1></div><div className="save-status"><Cloud size={16}/>{busy?'Salvando…':dirty?'Alterações não salvas':'Treinos e histórico online'}</div></div>
  {error&&<div className="error" role="alert"><p>{error}</p><button onClick={load} disabled={busy}>Recarregar dados</button></div>}
  <Tabs value={tab} onValueChange={setTab}><TabsList className="main-tabs"><TabsTrigger value="workouts"><Dumbbell/>Treinos</TabsTrigger><TabsTrigger value="session"><Play/>{active?'Em andamento':'Treinar'}</TabsTrigger><TabsTrigger value="history"><History/>Histórico</TabsTrigger><TabsTrigger value="library"><BookOpen/>Exercícios</TabsTrigger></TabsList>
