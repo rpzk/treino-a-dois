@@ -1,3 +1,5 @@
+import { healthcoreAiComplete } from "./healthcore-ai.ts";
+
 export type SessionCoachTip = {
   tip_technique: string;
   tip_progression: string | null;
@@ -63,8 +65,6 @@ export async function coachExercise(
     typeof input.previousKg === "number" ||
     typeof input.previousReps === "number";
 
-  const { healthcoreAiComplete } = await import("@/lib/healthcore-ai");
-
   const result = await healthcoreAiComplete({
     purpose: "fitcore.session_coach",
     tenantSchema: input.tenantSchema,
@@ -76,6 +76,7 @@ export async function coachExercise(
           "Você é o coach de sessão do FitCore (HealthCore).",
           "Responda APENAS com JSON válido, sem markdown.",
           'Formato: {"tip_technique":"string","tip_progression":"string"|null}',
+          "No máximo ~2 frases curtas no total (técnica + progressão).",
           "tip_technique: uma frase curta de execução/postura (obrigatória).",
           "tip_progression: uma frase curta de carga/reps se houver histórico; senão null.",
           "Sem diagnóstico médico, sem PHI, sem inventar lesões.",
