@@ -124,6 +124,8 @@
 .profile-badge{font-size:12px;color:#475569;border:1px solid #e8dfd1;background:#fdfbf7;border-radius:999px;padding:6px 12px}
 .portal-link{font-size:13px;color:#475569;text-decoration:none;padding:8px 10px;border-radius:8px}
 .portal-link:hover{background:#f5efe6;color:#1e293b}
+button.portal-link{border:0;background:transparent;cursor:pointer;font-family:inherit}
+button.portal-link:hover{background:#f5efe6}
 .app-shell main{max-width:72rem;margin:0 auto;padding:28px 24px 48px;min-height:calc(100vh - 120px)}
 .page-heading .eyebrow,.eyebrow{color:#0369a1;letter-spacing:.08em}
 .lime{color:#236b4e}
