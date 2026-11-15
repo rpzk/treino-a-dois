@@ -33,10 +33,41 @@ function getSqlite(): DatabaseSync {
     CREATE TABLE IF NOT EXISTS training (
       profile text PRIMARY KEY NOT NULL,
       data text NOT NULL,
-      revision integer DEFAULT 0 NOT NULL
+      revision integer DEFAULT 0 NOT NULL,
+      healthcore_patient_id text
     );
   `);
+  ensureHealthcorePatientIdColumn(sqlite);
   return sqlite;
+}
+
+function ensureHealthcorePatientIdColumn(db: DatabaseSync): void {
+  const columns = db.prepare(`PRAGMA table_info(training)`).all() as Array<{
+    name: string;
+  }>;
+  const hasColumn = columns.some((column) => column.name === "healthcore_patient_id");
+  if (!hasColumn) {
+    db.exec(`ALTER TABLE training ADD COLUMN healthcore_patient_id text`);
+  }
+  db.exec(`
+    CREATE UNIQUE INDEX IF NOT EXISTS training_healthcore_patient_id_uidx
+    ON training(healthcore_patient_id)
+    WHERE healthcore_patient_id IS NOT NULL
+  `);
+}
+
+export async function findProfileByHealthcorePatientId(
+  patientId: string,
+): Promise<string | null> {
+  const trimmed = patientId.trim();
+  if (!trimmed) return null;
+  const row = await database()
+    .prepare(
+      `SELECT profile FROM training WHERE healthcore_patient_id = ? LIMIT 1`,
+    )
+    .bind(trimmed)
+    .first<{ profile: string }>();
+  return row?.profile ?? null;
 }
 
 /** D1-shaped wrapper over Node's built-in SQLite for the training API routes. */
