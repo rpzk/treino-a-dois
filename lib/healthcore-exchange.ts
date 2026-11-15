@@ -12,7 +12,12 @@ export async function exchangeHealthcoreCode(input: {
   if (!secret) {
     throw new Error("FITCORE_EXCHANGE_SECRET missing");
   }
-  const issuer = input.issuer.replace(/\/$/, "");
+  // Portal may emit http:// behind a reverse proxy; following that redirect
+  // turns POST into GET and breaks exchange (405). Always call https.
+  let issuer = input.issuer.trim().replace(/\/$/, "");
+  if (issuer.startsWith("http://")) {
+    issuer = `https://${issuer.slice("http://".length)}`;
+  }
   const url = `${issuer}/api/v1/portal/my-training/exchange/`;
   const response = await fetch(url, {
     method: "POST",
