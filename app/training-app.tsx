@@ -13,8 +13,9 @@ import {Select,SelectTrigger,SelectValue,SelectContent,SelectItem} from '@/compo
 import {Progress} from '@/components/ui/progress';
 import {Skeleton} from '@/components/ui/skeleton';
 import {Toaster,toast} from 'sonner';
-import {summarizeProgress,type ProfileId} from '@/lib/training-progress';
-import {PORTAL_HOME_URL,profileConfig} from '@/lib/profile-config';
+import {summarizeProgress} from '@/lib/training-progress';
+import {PORTAL_HOME_URL,displayNameForProfile} from '@/lib/profile-config';
+import {isValidTrainingProfileId} from '@/lib/training-profile';
 import {exercises,exerciseGroups,blank,workoutSchema,sessionSchema,type State,type Workout,type Session,type Item} from '@/lib/training';
 const uid=()=>crypto.randomUUID();
 const legacyWorkoutCreatedAt='2026-09-14T15:00:00.000Z';
@@ -60,12 +61,13 @@ function ExercisePicker({onAdd}:{onAdd:(name:string)=>void}){
 }
 function Numeric({label,value,onChange,min=0,max=2000,step=1}:{label:string,value:number,onChange:(n:number)=>void,min?:number,max?:number,step?:number}){return <label className="number-field"><span>{label}</span><NumericInput aria-label={label} inputMode={step<1?'decimal':'numeric'} min={min} max={max} step={step} value={value} onValueChange={onChange}/></label>}
 export default function TrainingApp(){
- const [profile,setProfile]=useState<ProfileId>('lucas'),[data,setData]=useState<State>(blank),[revision,setRevision]=useState(0),[loading,setLoading]=useState(true),[busy,setBusy]=useState(false),[error,setError]=useState(''),[tab,setTab]=useState('workouts'),[edit,setEdit]=useState<Workout|null>(null),[detail,setDetail]=useState<Session|null>(null),[historyEdit,setHistoryEdit]=useState<Session|null>(null),[remove,setRemove]=useState<string|null>(null),[removeSession,setRemoveSession]=useState<string|null>(null),[finish,setFinish]=useState(false),[discard,setDiscard]=useState(false),[search,setSearch]=useState(''),[group,setGroup]=useState('all'),[tick,setTick]=useState(Date.now()),[dirty,setDirty]=useState(false),[reminderDismissed,setReminderDismissed]=useState(false);
+ const [profile,setProfile]=useState('lucas'),[data,setData]=useState<State>(blank),[revision,setRevision]=useState(0),[loading,setLoading]=useState(true),[busy,setBusy]=useState(false),[error,setError]=useState(''),[tab,setTab]=useState('workouts'),[edit,setEdit]=useState<Workout|null>(null),[detail,setDetail]=useState<Session|null>(null),[historyEdit,setHistoryEdit]=useState<Session|null>(null),[remove,setRemove]=useState<string|null>(null),[removeSession,setRemoveSession]=useState<string|null>(null),[finish,setFinish]=useState(false),[discard,setDiscard]=useState(false),[search,setSearch]=useState(''),[group,setGroup]=useState('all'),[tick,setTick]=useState(Date.now()),[dirty,setDirty]=useState(false),[reminderDismissed,setReminderDismissed]=useState(false);
  const [profileReady,setProfileReady]=useState(false);
  const [sessionError,setSessionError]=useState('');
+ const [sessionDisplayName,setSessionDisplayName]=useState<string|null>(null);
  const [exerciseOpen,setExerciseOpen]=useState<Record<string,boolean>>({});
  const audio=useRef<AudioContext|null>(null),notified=useRef<number|null>(null),lock=useRef(false),generation=useRef(0);
- const person=profileConfig[profile].name;
+ const person=displayNameForProfile(profile, sessionDisplayName);
  const today=localDay(tick);
  const orderedWorkouts=stableWorkoutList(data.workouts,data.workoutOrder);
  const suggested=suggestedWorkout(orderedWorkouts,data.sessions,today);
@@ -77,8 +79,8 @@ export default function TrainingApp(){
   try{
    const r=await fetch('/api/session',{cache:'no-store'});
    if(r.status===401){setSessionError('Abra o FitCore pelo portal do paciente (HealthCore).');setProfileReady(false);return;}
-   const j=await r.json() as {profile:ProfileId|null;authenticated?:boolean};
-   if(j.profile==='lucas'||j.profile==='natalia'){setProfile(j.profile);setProfileReady(true);return;}
+   const j=await r.json() as {profile:string|null;authenticated?:boolean;display_name?:string|null};
+   if(j.profile&&isValidTrainingProfileId(j.profile)){setProfile(j.profile);setSessionDisplayName(j.display_name??null);setProfileReady(true);return;}
    if(j.authenticated){setSessionError('Seu perfil de treino ainda não foi vinculado pela clínica.');setProfileReady(false);return;}
    setSessionError('Abra o FitCore pelo portal do paciente (HealthCore).');
    setProfileReady(false);

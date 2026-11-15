@@ -1,4 +1,4 @@
-import { database } from "@/lib/training-db";
+import { database, isValidTrainingProfileId } from "@/lib/training-db";
 import { blank, stateSchema } from "@/lib/training";
 import {
   assertProfileAllowed,
@@ -58,7 +58,8 @@ export async function PUT(req: Request) {
 
     const parsed = stateSchema.safeParse(input.state);
     if (
-      !["lucas", "natalia"].includes(input.profile) ||
+      typeof input.profile !== "string" ||
+      !isValidTrainingProfileId(input.profile) ||
       !Number.isInteger(input.revision) ||
       input.revision < 0 ||
       !parsed.success

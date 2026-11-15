@@ -1,4 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="FitCore">
+  <!-- Variant of HealthCore mark system: same 64/rx16 square; summer Washi accent -->
   <rect width="64" height="64" rx="16" fill="#236B4E"/>
   <path
     d="M15 18h10v28H15zm24 0h10v28H39zM25 28h14v8H25z"
