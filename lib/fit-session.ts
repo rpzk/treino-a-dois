@@ -65,3 +65,8 @@ export function fitSessionCookieHeader(session: FitSession): string {
   const secure = process.env.NODE_ENV === "production" ? "; Secure" : "";
   return `${FIT_SESSION_COOKIE}=${encodeURIComponent(token)}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${maxAge}${secure}`;
 }
+
+export function clearFitSessionCookieHeader(): string {
+  const secure = process.env.NODE_ENV === "production" ? "; Secure" : "";
+  return `${FIT_SESSION_COOKIE}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0${secure}`;
+}
