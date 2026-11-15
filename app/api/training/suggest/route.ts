@@ -34,13 +34,18 @@ export async function POST(req: Request) {
       headers: { "Cache-Control": "no-store" },
     });
   } catch (error) {
-    console.error(error);
+    console.error("[training/suggest]", error);
+    const message = error instanceof Error ? error.message : "";
+    if (/\(429\)|rate.?limit/i.test(message)) {
+      return Response.json(
+        { error: "Muitas sugestões em pouco tempo, aguarde um minuto." },
+        { status: 429, headers: { "Retry-After": "60" } },
+      );
+    }
     return Response.json(
       {
         error:
-          error instanceof Error
-            ? error.message
-            : "Não foi possível gerar a sugestão. Tente novamente.",
+          "Não foi possível gerar a sugestão agora. Tente de novo em instantes.",
       },
       { status: 502 },
     );
