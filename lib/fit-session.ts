@@ -1,5 +1,6 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 
+/** Keep in sync with `middleware.ts` (Edge cannot import this Node module). */
 export const FIT_SESSION_COOKIE = "fitcore_session";
 
 export type FitSession = {
