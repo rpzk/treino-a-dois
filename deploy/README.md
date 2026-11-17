@@ -73,3 +73,26 @@ docker compose -f deploy/docker-compose.yml up -d --build
 ```
 
 Verify: open FitCore URL without cookie → session gate / 401 on `/api/training`. From portal “Abrir sala de treino” → lands authenticated on the linked profile.
+
+## AI proxy (Part 3)
+
+Compose already omits `OPENAI_*`. FitCore calls HealthCore with the exchange secret:
+
+| Variable | Role |
+|---|---|
+| `HEALTHCORE_PUBLIC_URL` | Issuer for AI + SSO (alias: `HEALTHCORE_BASE_URL`) |
+| `FITCORE_EXCHANGE_SECRET` | `X-FitCore-Exchange-Secret` on AI complete/vision |
+| `HEALTHCORE_AI_COMPLETE_PATH` | Optional override (default `/api/v1/portal/my-training/ai-assist/`) |
+| `HEALTHCORE_AI_VISION_PATH` | Optional override (default `/api/v1/internal/fitcore/ai/vision/`) |
+
+Smoke after deploy (from a host that can reach the FitCore container + HealthCore):
+
+```bash
+# Ops ping (shared secret). Expects HealthCore LLM configured for the tenant.
+curl -sS -X POST http://127.0.0.1:3001/api/internal/ai-ping \
+  -H "Content-Type: application/json" \
+  -H "X-FitCore-Exchange-Secret: $FITCORE_EXCHANGE_SECRET" \
+  -d '{"tenant_schema":"clinica_rp"}'
+```
+
+Patient path: portal → FitCore session → UI “Sugerir com IA” → `POST /api/training/suggest` → HealthCore AI proxy. **Do not** add `OPENAI_API_KEY` to `deploy/.env` for FitCore.

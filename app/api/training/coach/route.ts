@@ -43,6 +43,7 @@ export async function POST(req: Request) {
     const clinicalContext = await fetchClinicalContextForSession(auth.ctx.session);
     const tip = await coachExercise({
       tenantSchema: auth.ctx.session.tenantSchema,
+      patientFhirId: auth.ctx.session.patientFhirId,
       clinicalContext,
       exerciseName,
       group: typeof body.group === "string" ? body.group : undefined,

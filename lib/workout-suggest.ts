@@ -104,6 +104,7 @@ export function buildSuggestSystem(ctx?: ClinicalContext | null): string {
 
 export async function suggestWorkout(input: {
   tenantSchema: string;
+  patientFhirId?: string;
   focus?: string;
   equipmentInventory?: EquipmentItem[];
   clinicalContext?: ClinicalContext | null;
@@ -121,6 +122,7 @@ export async function suggestWorkout(input: {
   const result = await healthcoreAiComplete({
     purpose: "fitcore.workout_suggest",
     tenantSchema: input.tenantSchema,
+    patientFhirId: input.patientFhirId,
     jsonMode: true,
     messages: [
       {

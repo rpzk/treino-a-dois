@@ -80,6 +80,7 @@ export async function POST(req: Request) {
     const result = await healthcoreAiVision({
       purpose: "fitcore.equipment_vision",
       tenantSchema: auth.ctx.session.tenantSchema,
+      patientFhirId: auth.ctx.session.patientFhirId,
       system: VISION_SYSTEM,
       prompt: VISION_PROMPT,
       images,

@@ -37,6 +37,7 @@ export async function POST(req: Request) {
     const clinicalContext = await fetchClinicalContextForSession(auth.ctx.session);
     const suggestion = await suggestWorkout({
       tenantSchema: auth.ctx.session.tenantSchema,
+      patientFhirId: auth.ctx.session.patientFhirId,
       clinicalContext,
       focus,
       equipmentInventory,

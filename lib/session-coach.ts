@@ -8,6 +8,7 @@ export type SessionCoachTip = {
 
 export type SessionCoachInput = {
   tenantSchema: string;
+  patientFhirId?: string;
   exerciseName: string;
   group?: string;
   sets: number;
@@ -92,6 +93,7 @@ export async function coachExercise(
   const result = await healthcoreAiComplete({
     purpose: "fitcore.session_coach",
     tenantSchema: input.tenantSchema,
+    patientFhirId: input.patientFhirId,
     jsonMode: true,
     messages: [
       {
