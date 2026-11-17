@@ -54,4 +54,22 @@ Then, if using Postgres, migrate linked rows:
 docker exec -it treino-a-dois node scripts/migrate-sqlite-to-pg.mjs --tenant clinica_rp
 ```
 
-Portal SSO / session cookie is Part 2.
+## Portal SSO (Part 2)
+
+Required env in `deploy/.env` (compose already wires them):
+
+| Variable | Role |
+|---|---|
+| `FITCORE_EXCHANGE_SECRET` | Shared with HealthCore (`X-FitCore-Exchange-Secret`) |
+| `FITCORE_SESSION_SECRET` | HMAC for `fitcore_session` cookie (defaults to exchange secret) |
+| `FITCORE_PUBLIC_URL` | `https://fit.rphealthtech.com` (HealthCore builds launch URLs with this) |
+| `HEALTHCORE_PUBLIC_URL` | Default issuer, e.g. `https://rp.rphealthtech.com` |
+
+Flow: portal CTA → HealthCore `my-training/launch/` → browser `GET /auth/healthcore?code&issuer` → FitCore POSTs exchange → sets HttpOnly cookie → redirects `/`. Redeploy after env change:
+
+```bash
+cd /opt/treino-a-dois
+docker compose -f deploy/docker-compose.yml up -d --build
+```
+
+Verify: open FitCore URL without cookie → session gate / 401 on `/api/training`. From portal “Abrir sala de treino” → lands authenticated on the linked profile.

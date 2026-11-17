@@ -37,7 +37,23 @@ UPDATE training SET healthcore_patient_id = '<uuid>' WHERE profile = 'natalia';
 
 Depois disso, `findProfileByHealthcorePatientId` / APIs internas resolvem o perfil pelo paciente. Para Postgres (`DATABASE_URL`), rode `scripts/migrate-sqlite-to-pg.mjs` após o link (só migra linhas com `healthcore_patient_id`), ou provisione `hc_<uuid>` via `POST /api/internal/provision`.
 
-Auth/SSO pelo portal é **Parte 2** — fora deste passo.
+## Entrada pelo portal (Parte 2 — SSO leve)
+
+Sem login paralelo no FitCore. O paciente autenticado no portal HealthCore recebe um code one-time e abre direto no FitCore:
+
+| Passo | URL / artefato |
+|---|---|
+| Launch (portal → HealthCore) | `POST {issuer}/api/v1/portal/my-training/launch/` |
+| Callback FitCore | `GET https://fit.rphealthtech.com/auth/healthcore?code=&issuer=` |
+| Exchange (FitCore → HealthCore) | `POST {issuer}/api/v1/portal/my-training/exchange/` + header `X-FitCore-Exchange-Secret` |
+| Sessão | cookie HttpOnly `fitcore_session` (HMAC), amarrada a `patient_fhir_id` + `tenant_schema` |
+| Gate APIs | `middleware.ts` (cookie presente) + `requireFitSession` em `/api/training*` |
+
+Resposta do exchange (contrato HealthCore): `{ patient_fhir_id, tenant_schema, fit_training_enabled }`. O perfil de treino resolve via `healthcore_patient_id` / Postgres `(tenant_schema, patient_fhir_id)`. Sem sessão → UI pede “abrir pelo portal”; APIs → 401.
+
+Env de produção (compose): `FITCORE_EXCHANGE_SECRET`, `FITCORE_SESSION_SECRET` (fallback no exchange), `FITCORE_PUBLIC_URL`, `HEALTHCORE_PUBLIC_URL`. **Sem `OPENAI_*` no FitCore.**
+
+Teste: `pnpm run test:fit-session`.
 
 ## Dados
 
