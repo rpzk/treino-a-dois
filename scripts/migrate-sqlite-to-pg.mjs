@@ -9,7 +9,7 @@
  *     [--dry-run] [--force]
  *
  * - Only rows linked to HealthCore (healthcore_patient_id, or an `hc_<32hex>`
- *   profile key) are migrated. Legacy local profiles (lucas/natalia) are skipped.
+ *   profile key) are migrated. Unlinked local rows are skipped.
  * - Idempotent: existing (tenant, patient) rows are left untouched unless --force.
  * - The SQLite file is opened read-only and never modified.
  */
@@ -73,11 +73,15 @@ function uuidFromHex32(hex) {
   return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
 }
 
+const RETIRED_DEMO = new Set(["lucas", "natalia"]);
+
 /** Resolve the patient FHIR id for a SQLite row, or null if not HealthCore-linked. */
 function patientIdFor(row) {
+  const profile = String(row.profile ?? "");
+  if (RETIRED_DEMO.has(profile)) return null;
   const linked = String(row.healthcore_patient_id ?? "").trim().toLowerCase();
   if (linked) return linked;
-  const m = /^hc_([0-9a-f]{32})$/.exec(String(row.profile));
+  const m = /^hc_([0-9a-f]{32})$/.exec(profile);
   return m ? uuidFromHex32(m[1]) : null;
 }
 

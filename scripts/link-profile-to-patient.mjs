@@ -1,19 +1,17 @@
 #!/usr/bin/env node
 /**
- * FitCore Part 1 — one-shot link of legacy SQLite profiles to HealthCore patients.
+ * FitCore — one-shot link of a SQLite training profile key to a HealthCore patient.
  *
- * Keeps profile keys `lucas` / `natalia` (UI themes + together-bar). Sets nullable
- * unique `training.healthcore_patient_id` (= HealthCore `patient_fhir_id`).
+ * Prefer provisioning `hc_<patient_fhir_id without dashes>` (or POST /api/internal/provision).
+ * This script accepts any safe ops profile key; retired demo keys `lucas` / `natalia`
+ * are rejected.
  *
  *   node scripts/link-profile-to-patient.mjs \
- *     --profile lucas \
- *     --patient-fhir-id aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee \
+ *     --profile hc_9dd61833321d4cf7aad6aaf75950df91 \
+ *     --patient-fhir-id 9dd61833-321d-4cf7-aad6-aaf75950df91 \
  *     [--sqlite /app/data/training.sqlite]
  *
- * Postgres: link in SQLite first, then `migrate-sqlite-to-pg.mjs`, or provision
- * a new `hc_<uuid>` row via POST /api/internal/provision (does not keep lucas/natalia).
- *
- * Auth/SSO is Part 2 — this script only writes the FK column.
+ * Postgres: use provision / migrate-sqlite-to-pg after SQLite is linked.
  */
 import fs from "node:fs";
 import path from "node:path";
@@ -22,7 +20,8 @@ import { parseArgs } from "node:util";
 
 const FHIR_ID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
-const PROFILE_RE = /^(lucas|natalia|hc_[0-9a-f]{32})$/;
+const OPS_PROFILE_RE = /^[a-z][a-z0-9_]{1,63}$/;
+const RETIRED_DEMO = new Set(["lucas", "natalia"]);
 
 const argv = process.argv.slice(2).filter((arg) => arg !== "--");
 const { values: args } = parseArgs({
@@ -41,7 +40,7 @@ const sqlitePath =
 
 if (!profile || !patientFhirId) {
   console.error(
-    "usage: link-profile-to-patient.mjs --profile lucas|natalia|hc_<32hex> --patient-fhir-id <uuid> [--sqlite path]",
+    "usage: link-profile-to-patient.mjs --profile <ops-key|hc_<32hex>> --patient-fhir-id <uuid> [--sqlite path]",
   );
   process.exit(2);
 }
@@ -51,7 +50,13 @@ if (process.env.DATABASE_URL?.trim()) {
   );
   process.exit(2);
 }
-if (!PROFILE_RE.test(profile)) {
+if (RETIRED_DEMO.has(profile)) {
+  console.error(
+    "perfil demo legado (lucas/natalia) não é mais suportado; provisione hc_<fhir> e apague a linha no SQLite",
+  );
+  process.exit(2);
+}
+if (!OPS_PROFILE_RE.test(profile)) {
   console.error(`profile inválido: ${profile}`);
   process.exit(2);
 }

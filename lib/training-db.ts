@@ -3,12 +3,17 @@ import path from "node:path";
 import { DatabaseSync, type SQLInputValue } from "node:sqlite";
 
 import {
+  isRetiredDemoProfileKey,
+  isValidOpsProfileKey,
   isValidTrainingProfileId,
   profileKeyForPatient,
 } from "@/lib/training-profile";
 import type { StoredProfile } from "@/lib/training-store";
 
-export { isValidTrainingProfileId } from "@/lib/training-profile";
+export {
+  isValidOpsProfileKey,
+  isValidTrainingProfileId,
+} from "@/lib/training-profile";
 
 const DEFAULT_DB_PATH = path.join(process.cwd(), "data", "training.sqlite");
 
@@ -196,14 +201,17 @@ export async function findProfileByHealthcorePatientId(
     )
     .bind(trimmed)
     .first<{ profile: string }>();
-  return row?.profile ?? null;
+  if (!row?.profile) return null;
+  // Hide retired couple-demo keys so SSO never surfaces lucas/natalia.
+  if (isRetiredDemoProfileKey(row.profile)) return null;
+  return row.profile;
 }
 
 /**
  * One-shot ops helper (SQLite): attach a HealthCore `patient_fhir_id` to an
- * existing training row (typically `lucas` / `natalia`) without renaming the
- * profile key. Prefer this over `provisionProfileForPatient` when you need to
- * keep legacy profile ids and their training history.
+ * existing training row without renaming the profile key. Prefer
+ * `provisionProfileForPatient` (`hc_<uuid>`) for new patients. Rejects retired
+ * demo keys (`lucas` / `natalia`).
  *
  * Postgres stores `(tenant_schema, patient_fhir_id)` directly — link there via
  * provision / migrate-sqlite-to-pg after SQLite rows are linked.
@@ -218,8 +226,12 @@ export async function linkExistingProfileToPatient(
     );
   }
   const profileId = profile.trim();
-  if (!isValidTrainingProfileId(profileId)) {
-    throw new Error("profile inválido");
+  if (!isValidOpsProfileKey(profileId)) {
+    throw new Error(
+      isRetiredDemoProfileKey(profileId)
+        ? "perfil demo legado (lucas/natalia) não é mais suportado; provisione hc_<fhir> e apague a linha no SQLite"
+        : "profile inválido",
+    );
   }
   const patientId = patientFhirId.trim().toLowerCase();
   if (!FHIR_ID_RE.test(patientId)) {
@@ -312,6 +324,16 @@ export async function provisionProfileForPatient(input: {
       display_name: stored?.displayName ?? displayName,
     };
   }
+
+  // Drop retired couple-demo rows that still hold this FHIR id (frees unique index).
+  await database()
+    .prepare(
+      `DELETE FROM training
+       WHERE healthcore_patient_id = ?
+         AND profile IN ('lucas', 'natalia')`,
+    )
+    .bind(patientFhirId)
+    .run();
 
   const existing = await findProfileByHealthcorePatientId(patientFhirId);
   if (existing) {

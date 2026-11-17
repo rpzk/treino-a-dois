@@ -2,7 +2,7 @@
 
 Prefer **Docker Compose** on the Hostinger VPS. Alternative: copy the Next.js `standalone` build and run under systemd + nginx.
 
-Product name: **FitCore** (`fit.rphealthtech.com`). Compose service/container may still say `treino`.
+Product name: **FitCore** (`fit.rphealthtech.com`). Compose service/container and host path may still say `treino-a-dois` (GitHub / volume history only — do not rename the GitHub repo in this flow).
 
 ## Prerequisites
 
@@ -23,7 +23,7 @@ App is published on host `127.0.0.1:3001` (container still listens on 3000; host
 certbot --nginx -d fit.rphealthtech.com
 ```
 
-SQLite lives in the named volume `treino-data` (`SQLITE_PATH=/app/data/training.sqlite`). Empty on first boot.
+SQLite lives in the named volume `treino-data` (`SQLITE_PATH=/app/data/training.sqlite`). Empty on first boot. Production runtime uses Postgres when `DATABASE_URL` is set.
 
 ## systemd (no Docker)
 
@@ -35,23 +35,35 @@ SQLite lives in the named volume `treino-data` (`SQLITE_PATH=/app/data/training.
 
 ## First workout sheet
 
-Open `https://fit.rphealthtech.com`, pick **Rafael** or **Ana Amélia**, go to **Treinos**, create the sheet. No seed data is shipped.
+Open FitCore via the HealthCore patient portal CTA (`fit_training_enabled`). The session picks the linked `hc_<fhir>` profile automatically — there is no demo profile picker.
 
-## Link HealthCore patients (Part 1)
+## Link HealthCore patients
 
-Keep profile keys `lucas` / `natalia`. Set `training.healthcore_patient_id` on the SQLite volume before (or instead of) relying only on Postgres provision:
+Prefer Postgres provision (`POST /api/internal/provision`) with real `patient_fhir_id` + `tenant_schema`. For SQLite-only ops, use a generic / `hc_` profile key (never demo slots):
 
 ```bash
-docker exec -it treino-a-dois sh -c 'unset DATABASE_URL; node scripts/link-profile-to-patient.mjs --profile lucas --patient-fhir-id <uuid> --sqlite /app/data/training.sqlite'
-docker exec -it treino-a-dois sh -c 'unset DATABASE_URL; node scripts/link-profile-to-patient.mjs --profile natalia --patient-fhir-id <uuid> --sqlite /app/data/training.sqlite'
+docker exec -it treino-a-dois sh -c 'unset DATABASE_URL; node scripts/link-profile-to-patient.mjs --profile hc_<32hex> --patient-fhir-id <uuid> --sqlite /app/data/training.sqlite'
 ```
-
-(SQL direto também serve — ver README na raiz.)
 
 Then, if using Postgres, migrate linked rows:
 
 ```bash
 docker exec -it treino-a-dois node scripts/migrate-sqlite-to-pg.mjs --tenant clinica_rp
+```
+
+### Purge legacy SQLite demo (ops follow-up)
+
+If the volume still has a row `profile = 'lucas'` (or `natalia`) pointing at a real FHIR id, delete it after Postgres is authoritative:
+
+```bash
+docker exec -it treino-a-dois sh -c 'unset DATABASE_URL; node -e "
+const {DatabaseSync}=require(\"node:sqlite\");
+const db=new DatabaseSync(\"/app/data/training.sqlite\");
+const before=db.prepare(\"SELECT profile, healthcore_patient_id FROM training\").all();
+console.log(JSON.stringify(before,null,2));
+db.prepare(\"DELETE FROM training WHERE profile IN ('\''lucas'\'','\''natalia'\'')\").run();
+console.log(\"purged\", db.prepare(\"SELECT changes() AS n\").get());
+"'
 ```
 
 ## Portal SSO (Part 2)
