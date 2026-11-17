@@ -1,31 +1,59 @@
-# Treino a Dois — modelo limpo
+# FitCore
 
-Aplicativo privado para duas pessoas montarem fichas, registrarem séries, cargas, repetições, variações e histórico de treino.
+App de treino do ecossistema HealthCore (`fit.rphealthtech.com`). Monta fichas, registra séries, cargas, repetições, variações e histórico.
 
-Este pacote é uma cópia independente e sanitizada. Ele não contém treinos, histórico, banco, credenciais, acesso privado nem o identificador do Site de origem.
+Nome de produto: **FitCore** (conjugado com HealthCore). O pacote/repo legado `treino-a-dois` permanece como identificador técnico.
 
-## Para instalar pelo ChatGPT
+## Perfis e vínculo HealthCore (Parte 1)
 
-1. Envie o arquivo ZIP completo ao ChatGPT com capacidade de criar Sites.
-2. Copie e envie o conteúdo de `PROMPT-PARA-O-CHATGPT.md` na mesma conversa.
-3. Responda aos nomes desejados para os dois perfis, caso o ChatGPT pergunte.
-4. Aguarde a criação e a publicação do novo Site privado na sua conta.
-5. Abra o link publicado e crie as fichas na aba **Treinos**.
+Chaves técnicas de perfil **não renomear** sem migração: `lucas` e `natalia` (UI / temas / together-bar). Nomes de exibição ficam em `lib/profile-config.ts` (`lucas` → Rafael, `natalia` → Ana Amélia).
 
-Os nomes ficam centralizados em `lib/profile-config.ts`. Os identificadores internos `lucas` e `natalia` são apenas chaves técnicas e devem ser preservados.
+Coluna SQLite nullable única `training.healthcore_patient_id` (= `patient_fhir_id` do HealthCore):
+
+| Artefato | Papel |
+|---|---|
+| `db/schema.ts` | Drizzle espelho |
+| `drizzle/0001_fitcore_healthcore_patient_id.sql` | Migration |
+| `lib/training-db.ts` | DDL no boot + lookup/link |
+
+### Vincular perfis existentes (one-shot)
+
+Quando houver contas portal, amarrar os slots atuais sem trocar a PK:
+
+```bash
+# SQLITE_PATH apontando para o arquivo de produção (ou volume Docker)
+unset DATABASE_URL
+pnpm run link:profile -- --profile lucas --patient-fhir-id <uuid-rafael> --sqlite /app/data/training.sqlite
+pnpm run link:profile -- --profile natalia --patient-fhir-id <uuid-ana-amelia> --sqlite /app/data/training.sqlite
+# ou: node scripts/link-profile-to-patient.mjs --profile lucas --patient-fhir-id <uuid> --sqlite …
+```
+
+Equivalente SQL:
+
+```sql
+UPDATE training SET healthcore_patient_id = '<uuid>' WHERE profile = 'lucas';
+UPDATE training SET healthcore_patient_id = '<uuid>' WHERE profile = 'natalia';
+```
+
+Depois disso, `findProfileByHealthcorePatientId` / APIs internas resolvem o perfil pelo paciente. Para Postgres (`DATABASE_URL`), rode `scripts/migrate-sqlite-to-pg.mjs` após o link (só migra linhas com `healthcore_patient_id`), ou provisione `hc_<uuid>` via `POST /api/internal/provision`.
+
+Auth/SSO pelo portal é **Parte 2** — fora deste passo.
 
 ## Dados
 
-No caminho **VPS / Node** (produção Hostinger), o app usa SQLite em arquivo (`SQLITE_PATH`, padrão `data/training.sqlite`) via `lib/training-db.ts`. A tabela `training` é criada vazia no boot. Linhas por perfil só aparecem quando cada perfil salva o primeiro estado.
-
-O caminho legado ChatGPT Sites / Cloudflare D1 (vinext + `.openai/hosting.json`) permanece nos scripts `sites:dev` / `sites:build`, mas **não** é o alvo deste deploy.
+- **SQLite (dev / legado VPS):** `SQLITE_PATH` ou `data/training.sqlite` via `lib/training-db.ts`. Tabela `training` criada/alterada no boot.
+- **Postgres (produção atual):** `DATABASE_URL` → schema `fitcore.profiles` com chave `(tenant_schema, patient_fhir_id)`.
 
 ## Verificação técnica
 
 - Node.js `>=22.13.0`
-- Gerenciador declarado: pnpm `11.25.0`
-- Build: `pnpm run build` (Next.js standalone)
+- pnpm `11.25.0`
+- Build: `pnpm run build`
 - Tipagem: `pnpm run typecheck`
-- Regressão: `pnpm run test:training`
+- Regressão: `pnpm run test:training` · `pnpm run test:training-db`
 
-Deploy no VPS: ver `deploy/` e `/cursor/stores/self/docs/deploy-fit-rphealthtech.md`.
+Deploy: `deploy/` e store `docs/deploy-fit-rphealhtech.md`.
+
+## Pacote ChatGPT Sites (legado)
+
+Cópia sanitizada ainda pode ser publicada como Site privado; ver `PROMPT-PARA-O-CHATGPT.md`. Esse caminho **não** é o runtime de `fit.rphealthtech.com`.

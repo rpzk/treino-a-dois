@@ -2,7 +2,10 @@ import fs from "node:fs";
 import path from "node:path";
 import { DatabaseSync, type SQLInputValue } from "node:sqlite";
 
-import { profileKeyForPatient } from "@/lib/training-profile";
+import {
+  isValidTrainingProfileId,
+  profileKeyForPatient,
+} from "@/lib/training-profile";
 import type { StoredProfile } from "@/lib/training-store";
 
 export { isValidTrainingProfileId } from "@/lib/training-profile";
@@ -194,6 +197,73 @@ export async function findProfileByHealthcorePatientId(
     .bind(trimmed)
     .first<{ profile: string }>();
   return row?.profile ?? null;
+}
+
+/**
+ * One-shot ops helper (SQLite): attach a HealthCore `patient_fhir_id` to an
+ * existing training row (typically `lucas` / `natalia`) without renaming the
+ * profile key. Prefer this over `provisionProfileForPatient` when you need to
+ * keep legacy profile ids and their training history.
+ *
+ * Postgres stores `(tenant_schema, patient_fhir_id)` directly — link there via
+ * provision / migrate-sqlite-to-pg after SQLite rows are linked.
+ */
+export async function linkExistingProfileToPatient(
+  profile: string,
+  patientFhirId: string,
+): Promise<{ profile: string; healthcore_patient_id: string }> {
+  if (usePostgresStore()) {
+    throw new Error(
+      "linkExistingProfileToPatient is SQLite-only; use provisionProfileForPatient or migrate-sqlite-to-pg",
+    );
+  }
+  const profileId = profile.trim();
+  if (!isValidTrainingProfileId(profileId)) {
+    throw new Error("profile inválido");
+  }
+  const patientId = patientFhirId.trim().toLowerCase();
+  if (!FHIR_ID_RE.test(patientId)) {
+    throw new Error("patient_fhir_id inválido");
+  }
+
+  const existingLink = await findProfileByHealthcorePatientId(patientId);
+  if (existingLink && existingLink !== profileId) {
+    throw new Error(
+      `patient_fhir_id já vinculado ao perfil ${existingLink}`,
+    );
+  }
+
+  const row = await database()
+    .prepare(`SELECT profile, healthcore_patient_id FROM training WHERE profile = ?`)
+    .bind(profileId)
+    .first<{ profile: string; healthcore_patient_id: string | null }>();
+
+  if (!row) {
+    await database()
+      .prepare(
+        `INSERT INTO training(profile, data, revision, healthcore_patient_id)
+         VALUES(?, ?, 0, ?)`,
+      )
+      .bind(profileId, BLANK_STATE, patientId)
+      .run();
+  } else {
+    const current = row.healthcore_patient_id?.trim().toLowerCase() || null;
+    if (current && current !== patientId) {
+      throw new Error(
+        `perfil ${profileId} já vinculado a outro patient_fhir_id`,
+      );
+    }
+    if (current !== patientId) {
+      await database()
+        .prepare(
+          `UPDATE training SET healthcore_patient_id = ? WHERE profile = ?`,
+        )
+        .bind(patientId, profileId)
+        .run();
+    }
+  }
+
+  return { profile: profileId, healthcore_patient_id: patientId };
 }
 
 export async function findDisplayNameByProfile(

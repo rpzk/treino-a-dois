@@ -85,6 +85,40 @@ try {
       db.provisionProfileForPatient({ tenantSchema: "", patientFhirId: fhir }),
       /tenant_schema/,
     );
+    await assert.rejects(
+      db.linkExistingProfileToPatient("lucas", fhir),
+      /SQLite-only/,
+    );
+  } else {
+    // Part 1: keep lucas/natalia keys while attaching patient_fhir_id.
+    const lucasFhir = randomUUID();
+    const nataliaFhir = randomUUID();
+    const lucas = await db.linkExistingProfileToPatient("lucas", lucasFhir);
+    assert.equal(lucas.profile, "lucas");
+    assert.equal(lucas.healthcore_patient_id, lucasFhir);
+    assert.equal(await db.findProfileByHealthcorePatientId(lucasFhir), "lucas");
+    assert.deepEqual(
+      await db.linkExistingProfileToPatient("lucas", lucasFhir),
+      lucas,
+      "idempotent re-link",
+    );
+
+    const natalia = await db.linkExistingProfileToPatient("natalia", nataliaFhir);
+    assert.equal(natalia.profile, "natalia");
+    assert.equal(await db.findProfileByHealthcorePatientId(nataliaFhir), "natalia");
+
+    await assert.rejects(
+      db.linkExistingProfileToPatient("lucas", nataliaFhir),
+      /já vinculado/,
+    );
+    await assert.rejects(
+      db.linkExistingProfileToPatient("natalia", lucasFhir),
+      /já vinculado/,
+    );
+    await assert.rejects(
+      db.linkExistingProfileToPatient("lucas", "not-a-uuid"),
+      /inválido/,
+    );
   }
 
   console.log(`training-db checks passed (${pg ? "postgres" : "sqlite"})`);
