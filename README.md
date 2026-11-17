@@ -2,11 +2,11 @@
 
 App de treino do ecossistema HealthCore (`fit.rphealthtech.com`). Monta fichas, registra séries, cargas, repetições, variações e histórico.
 
-Nome de produto: **FitCore** (conjugado com HealthCore). O pacote/repo legado `treino-a-dois` permanece como identificador técnico.
+Nome de produto: **FitCore** (conjugado com HealthCore). O identificador de repositório GitHub `treino-a-dois` permanece só como histórico; não renomear o remote neste fluxo.
 
-## Perfis e vínculo HealthCore (Parte 1)
+## Perfis e vínculo HealthCore
 
-Chaves técnicas de perfil **não renomear** sem migração: `lucas` e `natalia` (UI / temas / together-bar). Nomes de exibição ficam em `lib/profile-config.ts` (`lucas` → Rafael, `natalia` → Ana Amélia).
+Perfis de produto usam a chave `hc_<patient_fhir_id sem hífens>`, criada via provision. Nome de exibição vem da sessão / `display_name` no store — não há slots demo fixos.
 
 Coluna SQLite nullable única `training.healthcore_patient_id` (= `patient_fhir_id` do HealthCore):
 
@@ -16,26 +16,28 @@ Coluna SQLite nullable única `training.healthcore_patient_id` (= `patient_fhir_
 | `drizzle/0001_fitcore_healthcore_patient_id.sql` | Migration |
 | `lib/training-db.ts` | DDL no boot + lookup/link |
 
-### Vincular perfis existentes (one-shot)
+### Provisionar / vincular (one-shot)
 
-Quando houver contas portal, amarrar os slots atuais sem trocar a PK:
+Caminho preferido: `POST /api/internal/provision` (ou `provisionProfileForPatient`) com `tenant_schema` + `patient_fhir_id`. Em SQLite local, o linker genérico também aceita uma chave ops (não use slots demo aposentados):
 
 ```bash
-# SQLITE_PATH apontando para o arquivo de produção (ou volume Docker)
 unset DATABASE_URL
-pnpm run link:profile -- --profile lucas --patient-fhir-id <uuid-rafael> --sqlite /app/data/training.sqlite
-pnpm run link:profile -- --profile natalia --patient-fhir-id <uuid-ana-amelia> --sqlite /app/data/training.sqlite
-# ou: node scripts/link-profile-to-patient.mjs --profile lucas --patient-fhir-id <uuid> --sqlite …
+# chave canônica = hc_ + uuid sem hífens
+pnpm run link:profile -- \
+  --profile hc_9dd61833321d4cf7aad6aaf75950df91 \
+  --patient-fhir-id 9dd61833-321d-4cf7-aad6-aaf75950df91 \
+  --sqlite /app/data/training.sqlite
 ```
 
-Equivalente SQL:
+Equivalente SQL (somente chave `hc_…`):
 
 ```sql
-UPDATE training SET healthcore_patient_id = '<uuid>' WHERE profile = 'lucas';
-UPDATE training SET healthcore_patient_id = '<uuid>' WHERE profile = 'natalia';
+INSERT INTO training(profile, data, revision, healthcore_patient_id)
+VALUES ('hc_<32hex>', '{"workouts":[],"sessions":[],"active":null,"timer":null}', 0, '<uuid>')
+ON CONFLICT(profile) DO UPDATE SET healthcore_patient_id = excluded.healthcore_patient_id;
 ```
 
-Depois disso, `findProfileByHealthcorePatientId` / APIs internas resolvem o perfil pelo paciente. Para Postgres (`DATABASE_URL`), rode `scripts/migrate-sqlite-to-pg.mjs` após o link (só migra linhas com `healthcore_patient_id`), ou provisione `hc_<uuid>` via `POST /api/internal/provision`.
+Para Postgres (`DATABASE_URL`), rode `scripts/migrate-sqlite-to-pg.mjs` após o link (só migra linhas com `healthcore_patient_id` / chave `hc_`), ou provisione direto via `POST /api/internal/provision`.
 
 ## Entrada pelo portal (Parte 2 — SSO leve)
 
@@ -88,7 +90,7 @@ Teste: `pnpm run test:healthcore-ai`.
 
 ## Dados
 
-- **SQLite (dev / legado VPS):** `SQLITE_PATH` ou `data/training.sqlite` via `lib/training-db.ts`. Tabela `training` criada/alterada no boot.
+- **SQLite (dev / volume legado VPS):** `SQLITE_PATH` ou `data/training.sqlite` via `lib/training-db.ts`. Tabela `training` criada/alterada no boot. Linhas demo antigas devem ser apagadas no volume (ver deploy follow-up).
 - **Postgres (produção atual):** `DATABASE_URL` → schema `fitcore.profiles` com chave `(tenant_schema, patient_fhir_id)`.
 
 ## Verificação técnica

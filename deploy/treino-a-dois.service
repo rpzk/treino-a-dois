@@ -1,5 +1,5 @@
 [Unit]
-Description=Treino a Dois (Next.js)
+Description=FitCore (Next.js)
 After=network.target
 
 [Service]

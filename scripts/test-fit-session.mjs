@@ -83,9 +83,11 @@ assert.throws(() =>
   }),
 );
 
-assert.equal(assertProfileAllowed(null, "lucas")?.status, 400);
-assert.equal(assertProfileAllowed("lucas", null)?.status, 404);
-assert.equal(assertProfileAllowed("natalia", "lucas")?.status, 403);
-assert.equal(assertProfileAllowed("lucas", "lucas"), null);
+const linked = "hc_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+const other = "hc_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
+assert.equal(assertProfileAllowed(null, linked)?.status, 400);
+assert.equal(assertProfileAllowed(linked, null)?.status, 404);
+assert.equal(assertProfileAllowed(other, linked)?.status, 403);
+assert.equal(assertProfileAllowed(linked, linked), null);
 
 console.log("fit-session + exchange contract checks passed");

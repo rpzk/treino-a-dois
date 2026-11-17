@@ -1,4 +1,4 @@
-# Treino a Dois — Hostinger VPS (Node 22 + standalone Next.js + SQLite)
+# FitCore — Hostinger VPS (Node 22 + standalone Next.js + SQLite)
 FROM node:22.23-bookworm-slim AS deps
 WORKDIR /app
 RUN corepack enable

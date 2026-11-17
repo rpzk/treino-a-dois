@@ -86,39 +86,72 @@ try {
       /tenant_schema/,
     );
     await assert.rejects(
-      db.linkExistingProfileToPatient("lucas", fhir),
+      db.linkExistingProfileToPatient("fixture_alpha", fhir),
       /SQLite-only/,
     );
   } else {
-    // Part 1: keep lucas/natalia keys while attaching patient_fhir_id.
-    const lucasFhir = randomUUID();
-    const nataliaFhir = randomUUID();
-    const lucas = await db.linkExistingProfileToPatient("lucas", lucasFhir);
-    assert.equal(lucas.profile, "lucas");
-    assert.equal(lucas.healthcore_patient_id, lucasFhir);
-    assert.equal(await db.findProfileByHealthcorePatientId(lucasFhir), "lucas");
+    // Ops linker: generic fixture keys (not lucas/natalia) + FHIR id.
+    const alphaFhir = randomUUID();
+    const betaFhir = randomUUID();
+    const alpha = await db.linkExistingProfileToPatient("fixture_alpha", alphaFhir);
+    assert.equal(alpha.profile, "fixture_alpha");
+    assert.equal(alpha.healthcore_patient_id, alphaFhir);
+    assert.equal(await db.findProfileByHealthcorePatientId(alphaFhir), "fixture_alpha");
     assert.deepEqual(
-      await db.linkExistingProfileToPatient("lucas", lucasFhir),
-      lucas,
+      await db.linkExistingProfileToPatient("fixture_alpha", alphaFhir),
+      alpha,
       "idempotent re-link",
     );
 
-    const natalia = await db.linkExistingProfileToPatient("natalia", nataliaFhir);
-    assert.equal(natalia.profile, "natalia");
-    assert.equal(await db.findProfileByHealthcorePatientId(nataliaFhir), "natalia");
+    const beta = await db.linkExistingProfileToPatient("fixture_beta", betaFhir);
+    assert.equal(beta.profile, "fixture_beta");
+    assert.equal(await db.findProfileByHealthcorePatientId(betaFhir), "fixture_beta");
 
     await assert.rejects(
-      db.linkExistingProfileToPatient("lucas", nataliaFhir),
+      db.linkExistingProfileToPatient("fixture_alpha", betaFhir),
       /já vinculado/,
     );
     await assert.rejects(
-      db.linkExistingProfileToPatient("natalia", lucasFhir),
+      db.linkExistingProfileToPatient("fixture_beta", alphaFhir),
       /já vinculado/,
     );
     await assert.rejects(
-      db.linkExistingProfileToPatient("lucas", "not-a-uuid"),
+      db.linkExistingProfileToPatient("fixture_alpha", "not-a-uuid"),
       /inválido/,
     );
+    await assert.rejects(
+      db.linkExistingProfileToPatient("lucas", alphaFhir),
+      /legado|não é mais suportado/,
+    );
+    await assert.rejects(
+      db.linkExistingProfileToPatient("natalia", betaFhir),
+      /legado|não é mais suportado/,
+    );
+
+    // Retired demo row linked to a FHIR id is ignored for lookup and purged on provision.
+    const retiredFhir = randomUUID();
+    const sqlite = db.database();
+    await sqlite
+      .prepare(
+        `INSERT INTO training(profile, data, revision, healthcore_patient_id, display_name)
+         VALUES(?, ?, 0, ?, ?)`,
+      )
+      .bind(
+        "lucas",
+        JSON.stringify(blank),
+        retiredFhir,
+        "Legacy Demo",
+      )
+      .run();
+    assert.equal(await db.findProfileByHealthcorePatientId(retiredFhir), null);
+    const replaced = await db.provisionProfileForPatient({
+      tenantSchema: tenantA,
+      patientFhirId: retiredFhir,
+      displayName: "Paciente Real",
+    });
+    assert.equal(replaced.created, true);
+    assert.equal(replaced.profile, `hc_${retiredFhir.replaceAll("-", "")}`);
+    assert.equal(await db.findProfileByHealthcorePatientId(retiredFhir), replaced.profile);
   }
 
   console.log(`training-db checks passed (${pg ? "postgres" : "sqlite"})`);
