@@ -1,6 +1,8 @@
-# Deploy artifacts — Treino a Dois (VPS)
+# Deploy artifacts — FitCore (VPS)
 
 Prefer **Docker Compose** on the Hostinger VPS. Alternative: copy the Next.js `standalone` build and run under systemd + nginx.
+
+Product name: **FitCore** (`fit.rphealthtech.com`). Compose service/container may still say `treino`.
 
 ## Prerequisites
 
@@ -34,3 +36,22 @@ SQLite lives in the named volume `treino-data` (`SQLITE_PATH=/app/data/training.
 ## First workout sheet
 
 Open `https://fit.rphealthtech.com`, pick **Rafael** or **Ana Amélia**, go to **Treinos**, create the sheet. No seed data is shipped.
+
+## Link HealthCore patients (Part 1)
+
+Keep profile keys `lucas` / `natalia`. Set `training.healthcore_patient_id` on the SQLite volume before (or instead of) relying only on Postgres provision:
+
+```bash
+docker exec -it treino-a-dois sh -c 'unset DATABASE_URL; node scripts/link-profile-to-patient.mjs --profile lucas --patient-fhir-id <uuid> --sqlite /app/data/training.sqlite'
+docker exec -it treino-a-dois sh -c 'unset DATABASE_URL; node scripts/link-profile-to-patient.mjs --profile natalia --patient-fhir-id <uuid> --sqlite /app/data/training.sqlite'
+```
+
+(SQL direto também serve — ver README na raiz.)
+
+Then, if using Postgres, migrate linked rows:
+
+```bash
+docker exec -it treino-a-dois node scripts/migrate-sqlite-to-pg.mjs --tenant clinica_rp
+```
+
+Portal SSO / session cookie is Part 2.
