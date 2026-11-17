@@ -55,6 +55,36 @@ Env de produção (compose): `FITCORE_EXCHANGE_SECRET`, `FITCORE_SESSION_SECRET`
 
 Teste: `pnpm run test:fit-session`.
 
+## Proxy de IA (Parte 3)
+
+Toda sugestão / coach / visão passa pelo HealthCore (`get_llm_gateway` / BYOK tenant). FitCore **não** lê `OPENAI_API_KEY`.
+
+| Peça | Contrato |
+|---|---|
+| Client | `lib/healthcore-ai.ts` |
+| Auth | header `X-FitCore-Exchange-Secret` (mesmo da Parte 2) |
+| Tenant | `tenant_schema` da sessão FitCore (`fitcore_session`) |
+| Complete (live) | `POST {issuer}/api/v1/internal/fitcore/ai/complete/` |
+| Vision (live) | `POST {issuer}/api/v1/internal/fitcore/ai/vision/` |
+| UI | `POST /api/training/suggest`, `/api/training/coach`, `/api/training/equipment/scan` |
+
+Request complete (assumido / verificado em HealthCore `FitCoreAiCompleteView`):
+
+```json
+{
+  "messages": [{"role": "system|user|assistant", "content": "..."}],
+  "purpose": "fitcore.workout_suggest",
+  "tenant_schema": "clinica_rp",
+  "json_mode": true
+}
+```
+
+Response: `{ "content", "provider", "model", "billing_mode", "purpose" }`.
+
+O plano do Project citava `POST .../portal/my-training/ai-assist/`; HealthCore entregou as rotas `internal/fitcore/ai/*` (FitCore não tem JWT do portal). Override opcional: `HEALTHCORE_AI_COMPLETE_PATH` / `HEALTHCORE_AI_VISION_PATH`. Alias de issuer: `HEALTHCORE_BASE_URL` ou `HEALTHCORE_PUBLIC_URL`.
+
+Teste: `pnpm run test:healthcore-ai`.
+
 ## Dados
 
 - **SQLite (dev / legado VPS):** `SQLITE_PATH` ou `data/training.sqlite` via `lib/training-db.ts`. Tabela `training` criada/alterada no boot.
