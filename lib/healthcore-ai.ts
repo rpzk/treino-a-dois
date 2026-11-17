@@ -3,45 +3,36 @@
  *
  * Zero provider keys in FitCore (`OPENAI_*` / Groq / etc. must stay unset).
  * Auth = same `X-FitCore-Exchange-Secret` as Part 2 SSO exchange.
- * Tenant comes from the FitCore portal session (`fitcore_session`).
+ * Identity = `patient_fhir_id` + `tenant_schema` from the FitCore portal session.
  *
- * ## Live HealthCore contract (main)
+ * ## Assumed / Part 3 contract (Project + store)
  *
- * Text:  `POST {issuer}/api/v1/internal/fitcore/ai/complete/`
- * Vision: `POST {issuer}/api/v1/internal/fitcore/ai/vision/`
+ * Assist: `POST {issuer}/api/v1/portal/my-training/ai-assist/`
  * Header: `X-FitCore-Exchange-Secret: $FITCORE_EXCHANGE_SECRET`
  *
- * Complete body:
+ * Body:
  * ```json
  * {
  *   "messages": [{"role":"system|user|assistant","content":"..."}],
  *   "purpose": "fitcore.workout_suggest|fitcore.session_coach|fitcore.ping|...",
  *   "tenant_schema": "clinica_rp",
+ *   "patient_fhir_id": "uuid",
  *   "json_mode": true
  * }
  * ```
  *
- * Vision body:
- * ```json
- * {
- *   "purpose": "fitcore.equipment_vision",
- *   "tenant_schema": "clinica_rp",
- *   "system": "...",
- *   "prompt": "...",
- *   "images": [{"mime":"image/jpeg","data_base64":"..."}]
- * }
- * ```
- *
- * Response (both):
+ * Response:
  * `{ "content": string, "provider": string, "model": string, "billing_mode": string, "purpose": string }`
  *
- * ## Project plan draft name (not on HealthCore yet)
+ * Gate (HealthCore): `fit_training_enabled`, purpose allowlist, rate limit.
  *
- * Plan Parte 3 sketched `POST .../portal/my-training/ai-assist/` with
- * `IsPatientPortalUser`. FitCore has no portal JWT (only HMAC session +
- * exchange secret), so HealthCore shipped the internal routes above instead.
- * Override path with `HEALTHCORE_AI_COMPLETE_PATH` / `HEALTHCORE_AI_VISION_PATH`
- * if a portal alias lands later.
+ * ## Legacy alias (already on HealthCore main)
+ *
+ * `POST /api/v1/internal/fitcore/ai/complete/` — same body without requiring
+ * `patient_fhir_id`. Override with `HEALTHCORE_AI_COMPLETE_PATH` if needed.
+ *
+ * Vision remains on `POST /api/v1/internal/fitcore/ai/vision/` unless
+ * `HEALTHCORE_AI_VISION_PATH` is set.
  */
 
 import { normalizeIssuer } from "./healthcore-exchange.ts";
@@ -59,14 +50,17 @@ export type HealthcoreAiCompleteResult = {
   purpose: string;
 };
 
-/** Default complete path — HealthCore `FitCoreAiCompleteView` on tenant urls. */
-export const DEFAULT_AI_COMPLETE_PATH = "/api/v1/internal/fitcore/ai/complete/";
+/** Part 3 portal assist path (Plan + store contract). */
+export const PLAN_AI_ASSIST_PATH = "/api/v1/portal/my-training/ai-assist/";
+
+/** Default complete path — portal ai-assist. */
+export const DEFAULT_AI_COMPLETE_PATH = PLAN_AI_ASSIST_PATH;
+
+/** Legacy HealthCore complete path (still valid alias). */
+export const LEGACY_AI_COMPLETE_PATH = "/api/v1/internal/fitcore/ai/complete/";
 
 /** Default vision path — HealthCore `FitCoreAiVisionView`. */
 export const DEFAULT_AI_VISION_PATH = "/api/v1/internal/fitcore/ai/vision/";
-
-/** Plan draft alias (documented; not the live default). */
-export const PLAN_AI_ASSIST_PATH = "/api/v1/portal/my-training/ai-assist/";
 
 export function exchangeSecret(): string {
   const secret = process.env.FITCORE_EXCHANGE_SECRET?.trim() || "";
@@ -145,6 +139,8 @@ export async function healthcoreAiComplete(input: {
   messages: HealthcoreAiMessage[];
   purpose: string;
   tenantSchema: string;
+  /** From FitCore portal session; required by portal ai-assist contract. */
+  patientFhirId?: string;
   issuer?: string;
   jsonMode?: boolean;
   fetchImpl?: typeof fetch;
@@ -154,6 +150,7 @@ export async function healthcoreAiComplete(input: {
   if (!tenantSchema || tenantSchema === "public") {
     throw new Error("tenant_schema inválido");
   }
+  const patientFhirId = (input.patientFhirId || "").trim().toLowerCase();
   const url = buildAiCompleteUrl(input.issuer);
   const response = await (input.fetchImpl ?? fetch)(url, {
     method: "POST",
@@ -165,6 +162,7 @@ export async function healthcoreAiComplete(input: {
       messages: input.messages,
       purpose: input.purpose,
       tenant_schema: tenantSchema,
+      ...(patientFhirId ? { patient_fhir_id: patientFhirId } : {}),
       json_mode: Boolean(input.jsonMode),
     }),
   });
@@ -188,6 +186,7 @@ export type HealthcoreAiVisionResult = HealthcoreAiCompleteResult;
 export async function healthcoreAiVision(input: {
   purpose: string;
   tenantSchema: string;
+  patientFhirId?: string;
   system?: string;
   prompt: string;
   images: HealthcoreAiVisionImage[];
@@ -199,6 +198,7 @@ export async function healthcoreAiVision(input: {
   if (!tenantSchema || tenantSchema === "public") {
     throw new Error("tenant_schema inválido");
   }
+  const patientFhirId = (input.patientFhirId || "").trim().toLowerCase();
   const url = buildAiVisionUrl(input.issuer);
   const response = await (input.fetchImpl ?? fetch)(url, {
     method: "POST",
@@ -209,6 +209,7 @@ export async function healthcoreAiVision(input: {
     body: JSON.stringify({
       purpose: input.purpose,
       tenant_schema: tenantSchema,
+      ...(patientFhirId ? { patient_fhir_id: patientFhirId } : {}),
       ...(input.system ? { system: input.system } : {}),
       prompt: input.prompt,
       images: input.images.map((image) => ({

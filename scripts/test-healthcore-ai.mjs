@@ -12,6 +12,7 @@ delete process.env.HEALTHCORE_AI_VISION_PATH;
 const {
   DEFAULT_AI_COMPLETE_PATH,
   DEFAULT_AI_VISION_PATH,
+  LEGACY_AI_COMPLETE_PATH,
   PLAN_AI_ASSIST_PATH,
   assertNoProviderKeysInFitEnv,
   buildAiCompleteUrl,
@@ -25,23 +26,24 @@ const {
   parseSuggestedWorkout,
 } = await import("../lib/workout-suggest.ts");
 
-assert.equal(DEFAULT_AI_COMPLETE_PATH, "/api/v1/internal/fitcore/ai/complete/");
-assert.equal(DEFAULT_AI_VISION_PATH, "/api/v1/internal/fitcore/ai/vision/");
 assert.equal(PLAN_AI_ASSIST_PATH, "/api/v1/portal/my-training/ai-assist/");
+assert.equal(DEFAULT_AI_COMPLETE_PATH, PLAN_AI_ASSIST_PATH);
+assert.equal(LEGACY_AI_COMPLETE_PATH, "/api/v1/internal/fitcore/ai/complete/");
+assert.equal(DEFAULT_AI_VISION_PATH, "/api/v1/internal/fitcore/ai/vision/");
 
 assert.equal(
   buildAiCompleteUrl("http://rp.rphealthtech.com"),
-  "https://rp.rphealthtech.com/api/v1/internal/fitcore/ai/complete/",
+  "https://rp.rphealthtech.com/api/v1/portal/my-training/ai-assist/",
 );
 assert.equal(
   buildAiVisionUrl("https://demo.rphealthtech.com/"),
   "https://demo.rphealthtech.com/api/v1/internal/fitcore/ai/vision/",
 );
 
-process.env.HEALTHCORE_AI_COMPLETE_PATH = PLAN_AI_ASSIST_PATH;
+process.env.HEALTHCORE_AI_COMPLETE_PATH = LEGACY_AI_COMPLETE_PATH;
 assert.equal(
   buildAiCompleteUrl("https://rp.rphealthtech.com"),
-  "https://rp.rphealthtech.com/api/v1/portal/my-training/ai-assist/",
+  "https://rp.rphealthtech.com/api/v1/internal/fitcore/ai/complete/",
 );
 delete process.env.HEALTHCORE_AI_COMPLETE_PATH;
 
@@ -62,10 +64,12 @@ process.env.OPENAI_API_KEY = "sk-should-never-be-here";
 assert.throws(() => assertNoProviderKeysInFitEnv(), /OPENAI_API_KEY/);
 delete process.env.OPENAI_API_KEY;
 
+const patientId = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee";
 let seenComplete;
 await healthcoreAiComplete({
   purpose: "fitcore.workout_suggest",
   tenantSchema: "clinica_rp",
+  patientFhirId: patientId,
   jsonMode: true,
   messages: [
     { role: "system", content: "sys" },
@@ -98,7 +102,7 @@ await healthcoreAiComplete({
 
 assert.equal(
   seenComplete.url,
-  "https://rp.rphealthtech.com/api/v1/internal/fitcore/ai/complete/",
+  "https://rp.rphealthtech.com/api/v1/portal/my-training/ai-assist/",
 );
 assert.equal(seenComplete.init.method, "POST");
 assert.equal(
@@ -107,6 +111,7 @@ assert.equal(
 );
 const completeBody = JSON.parse(seenComplete.init.body);
 assert.equal(completeBody.tenant_schema, "clinica_rp");
+assert.equal(completeBody.patient_fhir_id, patientId);
 assert.equal(completeBody.purpose, "fitcore.workout_suggest");
 assert.equal(completeBody.json_mode, true);
 assert.equal(completeBody.messages.length, 2);
@@ -128,6 +133,7 @@ let seenVision;
 await healthcoreAiVision({
   purpose: "fitcore.equipment_vision",
   tenantSchema: "clinica_rp",
+  patientFhirId: patientId,
   prompt: "Liste equipamentos",
   images: [{ mime: "image/jpeg", dataBase64: "abc" }],
   fetchImpl: async (url, init) => {
@@ -151,6 +157,7 @@ assert.equal(
   "https://rp.rphealthtech.com/api/v1/internal/fitcore/ai/vision/",
 );
 const visionBody = JSON.parse(seenVision.init.body);
+assert.equal(visionBody.patient_fhir_id, patientId);
 assert.deepEqual(visionBody.images, [{ mime: "image/jpeg", data_base64: "abc" }]);
 
 const suggestion = parseSuggestedWorkout(

@@ -82,7 +82,7 @@ Compose already omits `OPENAI_*`. FitCore calls HealthCore with the exchange sec
 |---|---|
 | `HEALTHCORE_PUBLIC_URL` | Issuer for AI + SSO (alias: `HEALTHCORE_BASE_URL`) |
 | `FITCORE_EXCHANGE_SECRET` | `X-FitCore-Exchange-Secret` on AI complete/vision |
-| `HEALTHCORE_AI_COMPLETE_PATH` | Optional override (default `/api/v1/internal/fitcore/ai/complete/`) |
+| `HEALTHCORE_AI_COMPLETE_PATH` | Optional override (default `/api/v1/portal/my-training/ai-assist/`) |
 | `HEALTHCORE_AI_VISION_PATH` | Optional override (default `/api/v1/internal/fitcore/ai/vision/`) |
 
 Smoke after deploy (from a host that can reach the FitCore container + HealthCore):

@@ -63,17 +63,18 @@ Toda sugestão / coach / visão passa pelo HealthCore (`get_llm_gateway` / BYOK 
 |---|---|
 | Client | `lib/healthcore-ai.ts` |
 | Auth | header `X-FitCore-Exchange-Secret` (mesmo da Parte 2) |
-| Tenant | `tenant_schema` da sessão FitCore (`fitcore_session`) |
-| Complete (live) | `POST {issuer}/api/v1/internal/fitcore/ai/complete/` |
-| Vision (live) | `POST {issuer}/api/v1/internal/fitcore/ai/vision/` |
+| Identidade | `patient_fhir_id` + `tenant_schema` da sessão FitCore |
+| Assist (Part 3) | `POST {issuer}/api/v1/portal/my-training/ai-assist/` |
+| Vision | `POST {issuer}/api/v1/internal/fitcore/ai/vision/` |
 | UI | `POST /api/training/suggest`, `/api/training/coach`, `/api/training/equipment/scan` |
 
-Request complete (assumido / verificado em HealthCore `FitCoreAiCompleteView`):
+Request assist (HealthCore [#13](https://github.com/rpzk/HealthCore/pull/13)):
 
 ```json
 {
   "messages": [{"role": "system|user|assistant", "content": "..."}],
   "purpose": "fitcore.workout_suggest",
+  "patient_fhir_id": "uuid",
   "tenant_schema": "clinica_rp",
   "json_mode": true
 }
@@ -81,7 +82,7 @@ Request complete (assumido / verificado em HealthCore `FitCoreAiCompleteView`):
 
 Response: `{ "content", "provider", "model", "billing_mode", "purpose" }`.
 
-O plano do Project citava `POST .../portal/my-training/ai-assist/`; HealthCore entregou as rotas `internal/fitcore/ai/*` (FitCore não tem JWT do portal). Override opcional: `HEALTHCORE_AI_COMPLETE_PATH` / `HEALTHCORE_AI_VISION_PATH`. Alias de issuer: `HEALTHCORE_BASE_URL` ou `HEALTHCORE_PUBLIC_URL`.
+Alias legado: `/api/v1/internal/fitcore/ai/complete/` via `HEALTHCORE_AI_COMPLETE_PATH`. Issuer: `HEALTHCORE_PUBLIC_URL` ou `HEALTHCORE_BASE_URL`.
 
 Teste: `pnpm run test:healthcore-ai`.
 

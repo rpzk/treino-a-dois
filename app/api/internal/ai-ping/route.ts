@@ -21,7 +21,11 @@ export async function POST(req: Request) {
     return Response.json({ detail: "Segredo inválido." }, { status: 403 });
   }
 
-  let body: { tenant_schema?: string; issuer?: string } = {};
+  let body: {
+    tenant_schema?: string;
+    patient_fhir_id?: string;
+    issuer?: string;
+  } = {};
   try {
     body = (await req.json()) as typeof body;
   } catch {
@@ -29,6 +33,7 @@ export async function POST(req: Request) {
   }
 
   const tenantSchema = (body.tenant_schema || "clinica_rp").trim();
+  const patientFhirId = (body.patient_fhir_id || "").trim() || undefined;
   try {
     const result = await healthcoreAiComplete({
       messages: [
@@ -43,6 +48,7 @@ export async function POST(req: Request) {
       ],
       purpose: "fitcore.ping",
       tenantSchema,
+      patientFhirId,
       issuer: body.issuer,
     });
     return Response.json(result, { headers: { "Cache-Control": "no-store" } });
