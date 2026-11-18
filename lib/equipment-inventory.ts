@@ -3,8 +3,9 @@ export type EquipmentItem = { label: string };
 const LABEL_MAX = 40;
 const ITEMS_MAX = 30;
 
-const INVALID_JSON_MESSAGE = "Resposta da IA não é JSON válido.";
-const EMPTY_INVENTORY_MESSAGE =
+/** Exported so API routes can map these to user-facing HTTP responses. */
+export const INVALID_JSON_MESSAGE = "Resposta da IA não é JSON válido.";
+export const EMPTY_INVENTORY_MESSAGE =
   "Nenhum equipamento foi detectado na resposta.";
 
 function extractJsonObject(raw: string): unknown {

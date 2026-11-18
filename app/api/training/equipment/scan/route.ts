@@ -1,4 +1,8 @@
-import { parseEquipmentVision } from "@/lib/equipment-inventory";
+import {
+  EMPTY_INVENTORY_MESSAGE,
+  INVALID_JSON_MESSAGE,
+  parseEquipmentVision,
+} from "@/lib/equipment-inventory";
 import { healthcoreAiVision } from "@/lib/healthcore-ai";
 import { requireFitSession } from "@/lib/require-fit-session";
 
@@ -91,10 +95,35 @@ export async function POST(req: Request) {
     // Log the real error server-side only; never leak upstream details to the client.
     console.error("[training/equipment/scan]", error);
     const message = error instanceof Error ? error.message : "";
+    // Empty detection is a valid outcome — client can offer manual entry.
+    if (message === EMPTY_INVENTORY_MESSAGE) {
+      return Response.json(
+        { items: [], empty: true },
+        { headers: { "Cache-Control": "no-store" } },
+      );
+    }
+    if (message === INVALID_JSON_MESSAGE) {
+      return Response.json(
+        {
+          error:
+            "Não entendemos a identificação. Tente outras fotos ou adicione os equipamentos à mão.",
+        },
+        { status: 422 },
+      );
+    }
     if (/\(429\)|rate.?limit/i.test(message)) {
       return Response.json(
         { error: "Muitas leituras em pouco tempo, aguarde um minuto." },
         { status: 429, headers: { "Retry-After": "60" } },
+      );
+    }
+    if (/\(401\)|\(403\)/i.test(message)) {
+      return Response.json(
+        {
+          error:
+            "Sessão expirada ou sem permissão para identificar. Volte ao portal e abra o FitCore de novo.",
+        },
+        { status: 401 },
       );
     }
     return Response.json(

@@ -1,6 +1,6 @@
 'use client';
 import {useState,useEffect,useRef,type InputHTMLAttributes} from 'react';
-import {Dumbbell,Plus,Play,Timer,History,BookOpen,Check,ArrowUp,ArrowDown,Trash2,Pencil,Pause,SkipForward,ChevronRight,ChevronDown,CheckCircle2,Cloud,Save,RefreshCw,Sparkles,Camera,X} from 'lucide-react';
+import {Dumbbell,Plus,Play,Timer,History,BookOpen,Check,ArrowUp,ArrowDown,Trash2,Pencil,Pause,SkipForward,ChevronRight,ChevronDown,CheckCircle2,Cloud,Save,RefreshCw,Sparkles,Camera,Images,X} from 'lucide-react';
 import {Tabs,TabsList,TabsTrigger,TabsContent} from '@/components/ui/tabs';
 import {Dialog,DialogContent,DialogHeader,DialogTitle,DialogDescription} from '@/components/ui/dialog';
 import {AlertDialog,AlertDialogContent,AlertDialogHeader,AlertDialogTitle,AlertDialogDescription,AlertDialogFooter,AlertDialogCancel,AlertDialogAction} from '@/components/ui/alert-dialog';
@@ -62,22 +62,74 @@ function ExercisePicker({onAdd}:{onAdd:(name:string)=>void}){
  return <details className="exercise-picker"><summary>Adicionar exercício da biblioteca</summary><label className="field">Buscar exercício<input type="search" value={query} onChange={e=>setQuery(e.target.value)} placeholder="Nome do exercício…"/></label><div className="picker-results">{matches.map(e=><button type="button" className="picker-option" key={e.name} onClick={()=>{onAdd(e.name);toast.success(`${e.name} adicionado`);}}><span>{e.name}<small>{e.group}</small></span><Plus size={18}/></button>)}{!matches.length&&<p>Nenhum exercício encontrado.</p>}</div></details>;
 }
 function Numeric({label,value,onChange,min=0,max=2000,step=1}:{label:string,value:number,onChange:(n:number)=>void,min?:number,max?:number,step?:number}){return <label className="number-field"><span>{label}</span><NumericInput aria-label={label} inputMode={step<1?'decimal':'numeric'} min={min} max={max} step={step} value={value} onValueChange={onChange}/></label>}
-const EQUIP_MAX_PHOTOS=4,EQUIP_MAX_ITEMS=30,EQUIP_MAX_EDGE=1600,EQUIP_QUALITY=0.7;
+const EQUIP_MAX_PHOTOS=4,EQUIP_MAX_ITEMS=30,EQUIP_MAX_EDGE=1600,EQUIP_MAX_DECODED=1.8*1024*1024;
+const EQUIP_ACCEPT='image/jpeg,image/png,image/webp,image/*';
 function mergeEquipment(a:EquipmentItem[],b:EquipmentItem[]):EquipmentItem[]{const seen=new Set<string>(),out:EquipmentItem[]=[];for(const it of [...a,...b]){const label=it.label.trim().replace(/\s+/g,' ').slice(0,40);const key=label.toLocaleLowerCase('pt-BR');if(!label||seen.has(key)||out.length>=EQUIP_MAX_ITEMS)continue;seen.add(key);out.push({label});}return out;}
+function friendlyHttpError(status:number):string{
+ if(status===401)return 'Sessão expirada. Volte ao portal e abra o FitCore de novo.';
+ if(status===403)return 'Sem permissão para esta ação. Volte ao portal do paciente.';
+ if(status===413)return 'As fotos ficaram grandes demais. Tente com menos fotos ou mais de perto.';
+ if(status===422)return 'Não entendemos a identificação. Tente outras fotos ou adicione à mão.';
+ if(status===429)return 'Muitas tentativas em pouco tempo. Aguarde um minuto.';
+ if(status>=500)return 'Serviço temporariamente indisponível. Tente de novo em instantes.';
+ return 'Não foi possível concluir. Tente de novo.';
+}
+function userFacingError(e:unknown,fallback:string):string{
+ const msg=(e instanceof Error?e.message:String(e??'')).trim();
+ if(!msg||msg==='undefined'||msg==='null')return fallback;
+ if(/failed to fetch|networkerror|load failed|network request failed/i.test(msg))return 'Sem conexão. Verifique a internet e tente de novo.';
+ if(/unexpected token|is not valid json|json\.parse|syntaxerror/i.test(msg))return fallback;
+ if(/healthcore|fitcore_|openai|stack|at\s+\S+\s+\(/i.test(msg))return fallback;
+ return msg;
+}
+async function readApiJson<T=Record<string,unknown>>(r:Response):Promise<T & {error?:string}>{
+ const text=await r.text();
+ if(!text){
+  if(!r.ok)throw new Error(friendlyHttpError(r.status));
+  return {} as T & {error?:string};
+ }
+ try{return JSON.parse(text) as T & {error?:string};}
+ catch{throw new Error(friendlyHttpError(r.status||502));}
+}
+function isLikelyImageFile(file:File):boolean{
+ const type=(file.type||'').toLowerCase();
+ if(type.startsWith('image/'))return true;
+ // Some mobile cameras omit MIME; accept common extensions.
+ return /\.(jpe?g|png|webp|gif|bmp|heic|heif)$/i.test(file.name);
+}
+function isHeicLike(file:File):boolean{
+ const type=(file.type||'').toLowerCase();
+ const name=file.name.toLowerCase();
+ return type.includes('heic')||type.includes('heif')||name.endsWith('.heic')||name.endsWith('.heif');
+}
+function decodedBase64Bytes(base64:string):number{
+ const padding=base64.endsWith('==')?2:base64.endsWith('=')?1:0;
+ return Math.floor((base64.length*3)/4)-padding;
+}
 // Downscale + re-encode as JPEG in memory only; the photo is never stored anywhere.
 async function compressPhoto(file:File):Promise<{mime:string;data_base64:string}>{
+ if(isHeicLike(file))throw new Error('Fotos HEIC/HEIF não são suportadas neste aparelho. Tire de novo em JPEG ou escolha outra foto da galeria.');
  const url=URL.createObjectURL(file);
  try{
-  const img=await new Promise<HTMLImageElement>((res,rej)=>{const i=new Image();i.onload=()=>res(i);i.onerror=()=>rej(new Error('Não foi possível ler a foto.'));i.src=url;});
+  const img=await new Promise<HTMLImageElement>((res,rej)=>{const i=new Image();i.onload=()=>res(i);i.onerror=()=>rej(new Error('Não foi possível ler a foto. Tente JPEG ou PNG.'));i.src=url;});
+  if(!img.naturalWidth||!img.naturalHeight)throw new Error('Não foi possível ler a foto. Tente JPEG ou PNG.');
   const scale=Math.min(1,EQUIP_MAX_EDGE/Math.max(img.naturalWidth,img.naturalHeight));
   const w=Math.max(1,Math.round(img.naturalWidth*scale)),h=Math.max(1,Math.round(img.naturalHeight*scale));
   const canvas=document.createElement('canvas');canvas.width=w;canvas.height=h;
-  const ctx=canvas.getContext('2d');if(!ctx)throw new Error('Não foi possível processar a foto.');
+  const ctx=canvas.getContext('2d');if(!ctx)throw new Error('Não foi possível processar a foto neste navegador.');
   ctx.drawImage(img,0,0,w,h);
-  const dataUrl=canvas.toDataURL('image/jpeg',EQUIP_QUALITY);
-  const data_base64=dataUrl.slice(dataUrl.indexOf(',')+1);
+  for(const quality of [0.7,0.55,0.4]){
+   const dataUrl=canvas.toDataURL('image/jpeg',quality);
+   const comma=dataUrl.indexOf(',');
+   if(comma<0)continue;
+   const data_base64=dataUrl.slice(comma+1);
+   if(data_base64&&decodedBase64Bytes(data_base64)<=EQUIP_MAX_DECODED){
+    canvas.width=0;canvas.height=0;
+    return {mime:'image/jpeg',data_base64};
+   }
+  }
   canvas.width=0;canvas.height=0;
-  return {mime:'image/jpeg',data_base64};
+  throw new Error('Foto muito grande mesmo após compactar. Tire mais de perto ou com menor resolução.');
  }finally{URL.revokeObjectURL(url);}
 }
 export default function TrainingApp(){
@@ -90,6 +142,7 @@ export default function TrainingApp(){
  const [equipWizard,setEquipWizard]=useState<'closed'|'capture'|'review'>('closed');
  const [equipDraft,setEquipDraft]=useState<EquipmentItem[]>([]);
  const [equipBusy,setEquipBusy]=useState(false);
+ const [equipError,setEquipError]=useState('');
  const [equipPhotos,setEquipPhotos]=useState<{id:string;file:File;url:string}[]>([]);
  const [equipNew,setEquipNew]=useState('');
  const equipUrls=useRef<string[]>([]);
@@ -105,7 +158,7 @@ export default function TrainingApp(){
  const suggestedTimes=suggested?weeklyCount(suggested,data.sessions,today):0;
  const showCycleReminder=!reminderDismissed&&cycleDue(data.planCycleStartedAt,today);
  const cycleDays=data.planCycleStartedAt?elapsedCalendarDays(data.planCycleStartedAt,today):0;
- async function load(){const gen=++generation.current;setLoading(true);setError('');try{const r=await fetch(`/api/training?profile=${profile}`,{cache:'no-store'});const j=await r.json() as {state:State;revision:number;error:string};if(!r.ok)throw Error(j.error);if(gen!==generation.current)return;let state=j.state,rev=j.revision;if(!state.planCycleStartedAt||state.workouts.some(w=>!w.createdAt)||!state.workoutOrder){const migrated={...state,planCycleStartedAt:state.planCycleStartedAt??new Date().toISOString(),workouts:state.workouts.map(w=>({...w,createdAt:w.createdAt??legacyWorkoutCreatedAt})),workoutOrder:state.workoutOrder??initialWorkoutOrder(state.workouts)};const mr=await fetch('/api/training',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({profile,revision:rev,state:migrated})});if(mr.ok){const mj=await mr.json() as {revision:number};state=migrated;rev=mj.revision;}}if(gen!==generation.current)return;setData(state);setRevision(rev);setDirty(false);}catch(e){if(gen===generation.current)setError((e as Error).message);}finally{if(gen===generation.current)setLoading(false);}}
+ async function load(){const gen=++generation.current;setLoading(true);setError('');try{const r=await fetch(`/api/training?profile=${profile}`,{cache:'no-store'});const j=await readApiJson<{state:State;revision:number;error?:string}>(r);if(!r.ok)throw Error(j.error||friendlyHttpError(r.status));if(gen!==generation.current)return;let state=j.state,rev=j.revision;if(!state.planCycleStartedAt||state.workouts.some(w=>!w.createdAt)||!state.workoutOrder){const migrated={...state,planCycleStartedAt:state.planCycleStartedAt??new Date().toISOString(),workouts:state.workouts.map(w=>({...w,createdAt:w.createdAt??legacyWorkoutCreatedAt})),workoutOrder:state.workoutOrder??initialWorkoutOrder(state.workouts)};const mr=await fetch('/api/training',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({profile,revision:rev,state:migrated})});if(mr.ok){const mj=await readApiJson<{revision:number}>(mr);state=migrated;rev=mj.revision;}}if(gen!==generation.current)return;setData(state);setRevision(rev);setDirty(false);}catch(e){if(gen===generation.current)setError(userFacingError(e,'Não foi possível carregar seus treinos. Tente novamente.'));}finally{if(gen===generation.current)setLoading(false);}}
  useEffect(()=>{(async()=>{
   try{
    const r=await fetch('/api/session',{cache:'no-store'});
@@ -128,7 +181,7 @@ export default function TrainingApp(){
  const timer=data.timer,remaining=timer?(timer.end?Math.max(0,Math.ceil((timer.end-tick)/1000)):timer.left):0;
  useEffect(()=>{if(timer?.end&&remaining===0&&notified.current!==timer.end){notified.current=timer.end;toast.success('Descanso concluído. Próxima série!');if(audio.current?.state==='running')playRestAlert(audio.current);navigator.vibrate?.([160,80,160,80,160,80,160,80,220]);}},[remaining,timer?.end]);
  function enableAudio(){try{if(!audio.current)audio.current=new AudioContext();void audio.current.resume()}catch{}}
- async function save(next:State){if(lock.current)return false;lock.current=true;setBusy(true);setError('');try{const r=await fetch('/api/training',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({profile,revision,state:next})});const j=await r.json() as {state:State;revision:number;error:string};if(!r.ok)throw Error(j.error);setData(next);setRevision(j.revision);setDirty(false);return true;}catch(e){setError((e as Error).message);return false;}finally{lock.current=false;setBusy(false)}}
+ async function save(next:State){if(lock.current)return false;lock.current=true;setBusy(true);setError('');try{const r=await fetch('/api/training',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({profile,revision,state:next})});const j=await readApiJson<{state?:State;revision:number;error?:string}>(r);if(!r.ok)throw Error(j.error||friendlyHttpError(r.status));setData(next);setRevision(j.revision);setDirty(false);return true;}catch(e){setError(userFacingError(e,'Não foi possível salvar. Tente novamente.'));return false;}finally{lock.current=false;setBusy(false)}}
  function newWorkout(){setEdit({id:uid(),name:'',createdAt:new Date().toISOString(),items:[]})}
  async function askCoach(item:Item,key:string,setIndex:number){
   setCoachingKey(key);
@@ -137,43 +190,72 @@ export default function TrainingApp(){
    const previous=data.sessions.find(s=>s.items.some(same))?.items.find(same);
    const lastDone=previous?.logs.filter(l=>l.done).at(-1);
    const r=await fetch('/api/training/coach',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({exerciseName:item.name,group:item.group,sets:item.sets,reps:item.reps,rest:item.rest,previousKg:lastDone?.kg??null,previousReps:lastDone?.reps??null,setIndex:setIndex>=0?setIndex+1:item.sets})});
-   const j=(await r.json()) as {tip_technique?:string;tip_progression?:string|null;error?:string};
-   if(!r.ok)throw Error(j.error||'Falha na dica');
-   if(!j.tip_technique)throw Error('Dica incompleta');
+   const j=await readApiJson<{tip_technique?:string;tip_progression?:string|null;error?:string}>(r);
+   if(!r.ok)throw Error(j.error||friendlyHttpError(r.status));
+   if(!j.tip_technique)throw Error('A dica veio incompleta. Tente de novo.');
    setCoachTips(prev=>({...prev,[key]:{tip_technique:j.tip_technique!,tip_progression:j.tip_progression??null}}));
-  }catch(e){toast.error((e as Error).message)}finally{setCoachingKey(null)}
+  }catch(e){toast.error(userFacingError(e,'Não foi possível gerar a dica agora.'))}finally{setCoachingKey(null)}
  }
  async function suggestFromAi(focus='',inventory?:EquipmentItem[]){
   setSuggesting(true);
   try{
    const equipment_inventory=inventory??data.equipment_inventory??[];
    const r=await fetch('/api/training/suggest',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({focus,equipment_inventory})});
-   const j=await r.json() as {name?:string;items?:Array<{name:string;group:string;sets:number;reps:number;rest:number}>;error?:string};
-   if(!r.ok)throw Error(j.error||'Falha na sugestão');
-   if(!j.name||!j.items?.length)throw Error('Sugestão incompleta');
+   const j=await readApiJson<{name?:string;items?:Array<{name:string;group:string;sets:number;reps:number;rest:number}>;error?:string}>(r);
+   if(!r.ok)throw Error(j.error||friendlyHttpError(r.status));
+   if(!j.name||!j.items?.length)throw Error('A sugestão veio incompleta. Tente de novo.');
    setEdit({id:uid(),name:j.name,createdAt:new Date().toISOString(),items:j.items.map(i=>({...i,id:uid()}))});
    toast.success('Sugestão pronta — revise e salve a ficha.');
-  }catch(e){toast.error((e as Error).message);}
+  }catch(e){toast.error(userFacingError(e,'Não foi possível gerar a sugestão agora.'));}
   finally{setSuggesting(false);}
  }
  function clearEquipPhotos(){equipUrls.current.forEach(u=>URL.revokeObjectURL(u));equipUrls.current=[];setEquipPhotos([]);}
- function closeEquipWizard(){if(equipBusy)return;clearEquipPhotos();setEquipNew('');setEquipWizard('closed');}
- function openEquipWizard(){clearEquipPhotos();setEquipDraft(data.equipment_inventory??[]);setEquipNew('');setEquipWizard('capture');}
- function pickEquipPhotos(files:FileList|null){if(!files)return;const room=EQUIP_MAX_PHOTOS-equipPhotos.length;const picked=Array.from(files).filter(f=>f.type.startsWith('image/')).slice(0,Math.max(0,room));if(files.length>room)toast.error(`Máximo de ${EQUIP_MAX_PHOTOS} fotos.`);const added=picked.map(file=>{const url=URL.createObjectURL(file);equipUrls.current.push(url);return {id:uid(),file,url};});if(added.length)setEquipPhotos(cur=>[...cur,...added]);}
- function removeEquipPhoto(id:string){const ph=equipPhotos.find(x=>x.id===id);if(ph){URL.revokeObjectURL(ph.url);equipUrls.current=equipUrls.current.filter(u=>u!==ph.url);}setEquipPhotos(cur=>cur.filter(x=>x.id!==id));}
+ function closeEquipWizard(){if(equipBusy)return;clearEquipPhotos();setEquipNew('');setEquipError('');setEquipWizard('closed');}
+ function openEquipWizard(){clearEquipPhotos();setEquipDraft(data.equipment_inventory??[]);setEquipNew('');setEquipError('');setEquipWizard('capture');}
+ function pickEquipPhotos(files:FileList|null){
+  if(!files?.length)return;
+  setEquipError('');
+  setEquipPhotos(cur=>{
+   const room=EQUIP_MAX_PHOTOS-cur.length;
+   if(room<=0){toast.error(`Máximo de ${EQUIP_MAX_PHOTOS} fotos.`);return cur;}
+   const all=Array.from(files);
+   if(all.length>room)toast.error(`Máximo de ${EQUIP_MAX_PHOTOS} fotos.`);
+   const heic=all.filter(isHeicLike);
+   if(heic.length)toast.error('Fotos HEIC/HEIF não são suportadas. Use JPEG/PNG ou a câmera do app.');
+   const candidates=all.filter(f=>isLikelyImageFile(f)&&!isHeicLike(f));
+   const skipped=all.length-candidates.length-heic.length;
+   if(skipped>0)toast.error('Algumas fotos foram ignoradas (formato não suportado).');
+   const picked=candidates.slice(0,Math.max(0,room));
+   if(!picked.length)return cur;
+   const added=picked.map(file=>{const url=URL.createObjectURL(file);equipUrls.current.push(url);return {id:uid(),file,url};});
+   return [...cur,...added];
+  });
+ }
+ function removeEquipPhoto(id:string){setEquipPhotos(cur=>{const ph=cur.find(x=>x.id===id);if(ph){URL.revokeObjectURL(ph.url);equipUrls.current=equipUrls.current.filter(u=>u!==ph.url);}return cur.filter(x=>x.id!==id);});}
  async function scanEquipment(){
   if(!equipPhotos.length||equipBusy)return;
-  setEquipBusy(true);
+  setEquipBusy(true);setEquipError('');
   try{
-   const images=await Promise.all(equipPhotos.map(x=>compressPhoto(x.file)));
+   // Sequential compress avoids mobile OOM with several large camera shots.
+   const images:{mime:string;data_base64:string}[]=[];
+   for(const photo of equipPhotos)images.push(await compressPhoto(photo.file));
    const r=await fetch('/api/training/equipment/scan',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({images})});
-   const j=await r.json() as {items?:EquipmentItem[];error?:string};
-   if(!r.ok)throw Error(j.error||'Falha ao identificar equipamentos');
-   setEquipDraft(cur=>mergeEquipment(cur,j.items??[]));
+   const j=await readApiJson<{items?:EquipmentItem[];empty?:boolean;error?:string}>(r);
+   if(!r.ok)throw Error(j.error||friendlyHttpError(r.status));
+   const items=j.items??[];
+   setEquipDraft(cur=>mergeEquipment(cur,items));
    clearEquipPhotos();
    setEquipWizard('review');
-  }catch(e){toast.error((e as Error).message);}
-  finally{setEquipBusy(false);}
+   if(!items.length||j.empty){
+    const msg='Não detectamos equipamentos nas fotos. Adicione à mão ou tire outras fotos.';
+    setEquipError(msg);toast.message(msg);
+   }else{
+    toast.success(`${items.length} equipamento${items.length===1?'':'s'} identificado${items.length===1?'':'s'}. Confira a lista.`);
+   }
+  }catch(e){
+   const msg=userFacingError(e,'Não foi possível identificar os equipamentos agora.');
+   setEquipError(msg);toast.error(msg);
+  }finally{setEquipBusy(false);}
  }
  function addEquipItem(){const next=mergeEquipment(equipDraft,[{label:equipNew}]);if(next.length===equipDraft.length){if(equipNew.trim())toast.error(equipDraft.length>=EQUIP_MAX_ITEMS?'Limite de itens atingido.':'Esse item já está na lista.');return;}setEquipDraft(next);setEquipNew('');}
  async function saveEquipInventory(){const next:State={...data};if(equipDraft.length)next.equipment_inventory=equipDraft;else delete next.equipment_inventory;if(await save(next)){toast.success('Inventário salvo.');closeEquipWizard();}}
@@ -234,7 +316,7 @@ export default function TrainingApp(){
  <TabsContent value="library"><div className="section-heading"><div><h2>Biblioteca de exercícios</h2><p>{exercises.length} exercícios para montar seus treinos.</p></div></div><div className="library-filters"><input placeholder="Buscar exercício…" aria-label="Buscar exercício" value={search} onChange={e=>setSearch(e.target.value)}/><Select value={group} onValueChange={setGroup}><SelectTrigger aria-label="Grupo muscular"><SelectValue/></SelectTrigger><SelectContent><SelectItem value="all">Todos os grupos</SelectItem>{Object.keys(exerciseGroups).map(g=><SelectItem key={g} value={g}>{g}</SelectItem>)}</SelectContent></Select></div><div className="library-grid">{filtered.map(e=><div className="library-item" key={e.name}><span className="library-icon"><Dumbbell size={20}/></span><div><h3>{e.name}</h3><p>{e.group}</p></div></div>)}</div>{!filtered.length&&<p className="simple-empty">Nenhum exercício encontrado.</p>}</TabsContent>
  </> }</Tabs>
  </main><footer className="footer"><span>FitCore · HealthCore</span><span>Seu ritmo. Seu registro.</span></footer>
- <Dialog open={equipWizard!=='closed'} onOpenChange={o=>{if(!o)closeEquipWizard()}}><DialogContent className="editor-dialog equip-dialog"><DialogHeader><DialogTitle>{equipWizard==='review'?'Confirme seus equipamentos':'Fotografar equipamentos'}</DialogTitle><DialogDescription>{equipWizard==='review'?'Remova o que não existe e adicione o que faltou. As fotos não são guardadas.':`Tire até ${EQUIP_MAX_PHOTOS} fotos da sua academia. As fotos são usadas só para identificar os equipamentos e não são guardadas.`}</DialogDescription></DialogHeader>{equipWizard==='capture'&&<><label className={`equip-picker${equipPhotos.length>=EQUIP_MAX_PHOTOS?' disabled':''}`}><Camera size={22}/><span>{equipPhotos.length?'Adicionar outra foto':'Tirar ou escolher fotos'}</span><input type="file" accept="image/*" capture="environment" multiple disabled={equipBusy||equipPhotos.length>=EQUIP_MAX_PHOTOS} onChange={e=>{pickEquipPhotos(e.target.files);e.target.value='';}}/></label>{!!equipPhotos.length&&<div className="equip-thumbs">{equipPhotos.map(ph=>(<div className="equip-thumb" key={ph.id}><img src={ph.url} alt="Foto de equipamento"/><button type="button" aria-label="Remover foto" disabled={equipBusy} onClick={()=>removeEquipPhoto(ph.id)}><X size={14}/></button></div>))}</div>}<div className="equip-actions"><button type="button" className="secondary" onClick={closeEquipWizard} disabled={equipBusy}>Cancelar</button><button type="button" className="primary" onClick={()=>void scanEquipment()} disabled={equipBusy||!equipPhotos.length}><Sparkles size={18}/>{equipBusy?'Identificando…':'Identificar equipamentos'}</button></div>{!!equipDraft.length&&<button type="button" className="equip-link" onClick={()=>setEquipWizard('review')} disabled={equipBusy}>Editar lista atual ({equipDraft.length})</button>}</>}{equipWizard==='review'&&<><div className="equip-chips">{equipDraft.length?equipDraft.map(it=>(<span className="equip-chip removable" key={it.label}>{it.label}<button type="button" aria-label={`Remover ${it.label}`} onClick={()=>setEquipDraft(cur=>cur.filter(x=>x.label!==it.label))}><X size={13}/></button></span>)):<p className="equip-empty">Nenhum equipamento na lista.</p>}</div><form className="equip-add" onSubmit={e=>{e.preventDefault();addEquipItem();}}><input placeholder="Adicionar equipamento…" aria-label="Adicionar equipamento" maxLength={40} value={equipNew} onChange={e=>setEquipNew(e.target.value)}/><button type="submit" className="secondary" disabled={!equipNew.trim()}><Plus size={16}/>Adicionar</button></form><div className="equip-actions"><button type="button" className="secondary" onClick={()=>setEquipWizard('capture')} disabled={busy||suggesting}><Camera size={18}/>Mais fotos</button><button type="button" className="secondary" onClick={()=>void saveEquipInventory()} disabled={busy||suggesting||!!error}><Save size={18}/>Salvar inventário</button><button type="button" className="primary" onClick={()=>void suggestFromEquipDraft()} disabled={busy||suggesting||!!error||!equipDraft.length}><Sparkles size={18}/>Sugerir ficha</button></div></>}</DialogContent></Dialog>
+ <Dialog open={equipWizard!=='closed'} onOpenChange={o=>{if(!o)closeEquipWizard()}}><DialogContent className="editor-dialog equip-dialog" showCloseButton={!equipBusy}><DialogHeader><DialogTitle>{equipWizard==='review'?'Confirme seus equipamentos':'Fotografar equipamentos'}</DialogTitle><DialogDescription>{equipWizard==='review'?'Remova o que não existe e adicione o que faltou. As fotos não são guardadas.':`Até ${EQUIP_MAX_PHOTOS} fotos da academia. Use a câmera ou a galeria — as fotos só servem para identificar e não são guardadas.`}</DialogDescription></DialogHeader>{equipError&&<div className="equip-alert" role="alert">{equipError}</div>}{equipWizard==='capture'&&<><div className={`equip-pickers${equipPhotos.length>=EQUIP_MAX_PHOTOS?' disabled':''}`}><label className="equip-picker"><Camera size={22}/><span>{equipPhotos.length?'Outra foto (câmera)':'Tirar foto'}</span><input type="file" accept={EQUIP_ACCEPT} capture="environment" disabled={equipBusy||equipPhotos.length>=EQUIP_MAX_PHOTOS} onChange={e=>{pickEquipPhotos(e.target.files);e.target.value='';}}/></label><label className="equip-picker"><Images size={22}/><span>{equipPhotos.length?'Outra da galeria':'Escolher da galeria'}</span><input type="file" accept={EQUIP_ACCEPT} multiple disabled={equipBusy||equipPhotos.length>=EQUIP_MAX_PHOTOS} onChange={e=>{pickEquipPhotos(e.target.files);e.target.value='';}}/></label></div>{!equipPhotos.length&&<p className="equip-hint">Dica: fotos de frente para as máquinas ou do rack de pesos funcionam melhor. Evite HEIC.</p>}{!!equipPhotos.length&&<div className="equip-thumbs">{equipPhotos.map(ph=>(<div className="equip-thumb" key={ph.id}><img src={ph.url} alt="Foto de equipamento"/><button type="button" aria-label="Remover foto" disabled={equipBusy} onClick={()=>removeEquipPhoto(ph.id)}><X size={14}/></button></div>))}</div>}<div className="equip-actions"><button type="button" className="secondary" onClick={closeEquipWizard} disabled={equipBusy}>Cancelar</button><button type="button" className="primary" onClick={()=>void scanEquipment()} disabled={equipBusy||!equipPhotos.length}><Sparkles size={18}/>{equipBusy?'Identificando…':'Identificar equipamentos'}</button></div>{!!equipDraft.length&&<button type="button" className="equip-link" onClick={()=>{setEquipError('');setEquipWizard('review');}} disabled={equipBusy}>Editar lista atual ({equipDraft.length})</button>}</>}{equipWizard==='review'&&<><div className="equip-chips">{equipDraft.length?equipDraft.map(it=>(<span className="equip-chip removable" key={it.label}>{it.label}<button type="button" aria-label={`Remover ${it.label}`} onClick={()=>setEquipDraft(cur=>cur.filter(x=>x.label!==it.label))}><X size={13}/></button></span>)):<p className="equip-empty">Nenhum equipamento na lista. Adicione à mão ou tire novas fotos.</p>}</div><form className="equip-add" onSubmit={e=>{e.preventDefault();addEquipItem();}}><input placeholder="Adicionar equipamento…" aria-label="Adicionar equipamento" maxLength={40} value={equipNew} onChange={e=>setEquipNew(e.target.value)}/><button type="submit" className="secondary" disabled={!equipNew.trim()}><Plus size={16}/>Adicionar</button></form><div className="equip-actions"><button type="button" className="secondary" onClick={()=>{setEquipError('');setEquipWizard('capture');}} disabled={busy||suggesting}><Camera size={18}/>Mais fotos</button><button type="button" className="secondary" onClick={()=>void saveEquipInventory()} disabled={busy||suggesting||!!error}><Save size={18}/>Salvar inventário</button><button type="button" className="primary" onClick={()=>void suggestFromEquipDraft()} disabled={busy||suggesting||!!error||!equipDraft.length}><Sparkles size={18}/>Sugerir ficha</button></div></>}</DialogContent></Dialog>
  <Dialog open={!!edit} onOpenChange={open=>{if(!open&&!busy)setEdit(null)}}><DialogContent className="editor-dialog"><DialogHeader><DialogTitle>{data.workouts.some(w=>w.id===edit?.id)?'Editar treino':'Montar treino'}</DialogTitle><DialogDescription>Configure o treino de {person}. Ao salvar uma ficha nova ou alterada, começa um novo ciclo de 6 semanas.</DialogDescription></DialogHeader>{edit&&<><label className="field">Nome do treino<input placeholder="Ex.: Treino A · Peito e tríceps" maxLength={80} value={edit.name} onChange={e=>setEdit({...edit,name:e.target.value})}/></label><ExercisePicker onAdd={add}/><div className="editor-list">{!edit.items.length&&<div className="editor-empty" style={{display:"grid",gap:12,justifyItems:"center"}}><p>Selecione um exercício ou peça uma sugestão.</p><button type="button" className="secondary" disabled={suggesting||busy} onClick={()=>void suggestFromAi(edit.name)}><Sparkles size={17}/>{suggesting?'Gerando sugestão…':'Sugerir com IA'}</button></div>}{edit.items.map((i,index)=><div className="editor-item" key={i.id}><div className="editor-item-heading"><div><span className="eyebrow">{i.group}</span><h3>{index+1}. {i.name}</h3></div><div className="reorder-buttons"><button className="icon-button" aria-label={`Mover ${i.name} para cima`} disabled={index===0} onClick={()=>{const a=[...edit.items];[a[index-1],a[index]]=[a[index],a[index-1]];setEdit({...edit,items:a})}}><ArrowUp size={16}/></button><button className="icon-button" aria-label={`Mover ${i.name} para baixo`} disabled={index===edit.items.length-1} onClick={()=>{const a=[...edit.items];[a[index+1],a[index]]=[a[index],a[index+1]];setEdit({...edit,items:a})}}><ArrowDown size={16}/></button><button className="icon-button" aria-label={`Remover ${i.name}`} onClick={()=>setEdit({...edit,items:edit.items.filter(x=>x.id!==i.id)})}><Trash2 size={16}/></button></div></div><label className="field variation-field">Variação<input aria-label={`Variação de ${i.name}`} placeholder="Ex.: pegada neutra, banco inclinado…" maxLength={300} value={i.variation??''} onChange={e=>editItem(index,{variation:e.target.value})}/></label><div className="edit-numbers"><Numeric label="Séries" value={i.sets} min={1} max={20} onChange={n=>editItem(index,{sets:n})}/><Numeric label="Repetições" value={i.reps} min={1} max={1000} onChange={n=>editItem(index,{reps:n})}/><Numeric label="Descanso (s)" value={i.rest} max={1800} onChange={n=>editItem(index,{rest:n})}/></div></div>)}</div><p className="estimate-note">Tempo estimado: ~{Math.ceil(estimateSeconds(edit.items)/60)} min. Considera 3 s por repetição e os descansos entre séries, sem descanso após a última série de cada exercício. Não inclui aquecimento ou troca de aparelhos.</p>{error&&<p className="error" role="alert">{error}</p>}<button className="primary full" disabled={busy} onClick={saveWorkout}><Check size={18}/>{busy?'Salvando…':'Salvar treino'}</button></>}</DialogContent></Dialog>
  <Dialog open={!!detail} onOpenChange={o=>{if(!o)setDetail(null)}}><DialogContent className="editor-dialog"><DialogHeader><DialogTitle>{detail?.name}</DialogTitle><DialogDescription>{detail&&new Date(detail.started).toLocaleString('pt-BR',{timeZone:trainingZone})}</DialogDescription></DialogHeader>{detail?.items.map(i=><div className="detail-exercise" key={i.id}><h3>{i.name}</h3>{i.variation&&<p>Variação: {i.variation}</p>}<p>{i.logs.map((l,n)=>l.done?`${n+1}ª: ${displayKg(l.kg)} × ${l.reps} reps`:`${n+1}ª: não concluída`).join(' / ')}</p></div>)}{detail&&<div className="history-actions"><button className="secondary" onClick={()=>{setHistoryEdit(structuredClone(detail));setDetail(null)}}><Pencil size={17}/>Editar registro</button><button className="danger-button" onClick={()=>{setRemoveSession(detail.id);setDetail(null)}}><Trash2 size={17}/>Excluir registro</button></div>}</DialogContent></Dialog>
  <Dialog open={!!historyEdit} onOpenChange={open=>{if(!open&&!busy)setHistoryEdit(null)}}><DialogContent className="editor-dialog history-editor"><DialogHeader><DialogTitle>Editar histórico</DialogTitle><DialogDescription>Corrija a data, o nome, as cargas, repetições, variações e séries concluídas.</DialogDescription></DialogHeader>{historyEdit&&<><label className="field">Nome do treino<input maxLength={80} value={historyEdit.name} onChange={e=>setHistoryEdit({...historyEdit,name:e.target.value})}/></label><label className="field">Data do treino<input type="date" value={localDay(historyEdit.finished??historyEdit.started)} onChange={e=>e.target.value&&setHistoryEdit(moveSessionToDay(historyEdit,e.target.value))}/></label><div className="editor-list">{historyEdit.items.map((item,itemIndex)=><div className="editor-item" key={item.id}><div className="editor-item-heading"><div><span className="eyebrow">{item.group}</span><h3>{item.name}</h3></div></div><label className="field variation-field">Variação<input maxLength={300} value={item.variation??''} onChange={e=>historyItemEdit(itemIndex,{variation:e.target.value})}/></label><div className="set-head"><span>SÉRIE</span><span>KG</span><span>REPS</span><span>FEITA</span></div>{item.logs.map((log,logIndex)=><div className={`set-row ${log.done?'done':''}`} key={logIndex}><span className="set-index">{logIndex+1}</span><WeightInput aria-label={`Carga da série ${logIndex+1} de ${item.name}`} value={log.kg} onValueChange={kg=>historyLogEdit(itemIndex,logIndex,{kg})}/><NumericInput aria-label={`Repetições da série ${logIndex+1} de ${item.name}`} min="0" max="1000" value={log.reps} onValueChange={reps=>historyLogEdit(itemIndex,logIndex,{reps})}/><Checkbox className="series-check" aria-label={`Série ${logIndex+1} concluída`} checked={log.done} onCheckedChange={done=>historyLogEdit(itemIndex,logIndex,{done:!!done})}/></div>)}</div>)}</div><button className="primary full" disabled={busy} onClick={saveHistory}><Save size={18}/>{busy?'Salvando…':'Salvar correções'}</button></>}</DialogContent></Dialog>
