@@ -1,21 +1,11 @@
 import { exchangeHealthcoreCode } from "@/lib/healthcore-exchange";
 import { fitSessionCookieHeader } from "@/lib/fit-session";
+import { resolvePublicOrigin } from "@/lib/public-origin";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const SESSION_TTL_SECONDS = 60 * 60 * 12;
-
-function publicOrigin(req: Request): string {
-  const configured = (process.env.FITCORE_PUBLIC_URL || "").trim().replace(/\/$/, "");
-  if (configured) return configured;
-  const proto = (req.headers.get("x-forwarded-proto") || "https").split(",")[0].trim();
-  const host = (req.headers.get("x-forwarded-host") || req.headers.get("host") || "")
-    .split(",")[0]
-    .trim();
-  if (host) return `${proto}://${host}`;
-  return new URL(req.url).origin;
-}
 
 export async function GET(req: Request) {
   const url = new URL(req.url);
@@ -35,7 +25,7 @@ export async function GET(req: Request) {
       tenantSchema: exchanged.tenant_schema,
       exp: Math.floor(Date.now() / 1000) + SESSION_TTL_SECONDS,
     };
-    const redirectTo = new URL("/", publicOrigin(req));
+    const redirectTo = new URL("/", resolvePublicOrigin(req));
     redirectTo.searchParams.set("from", "healthcore");
     return new Response(null, {
       status: 302,

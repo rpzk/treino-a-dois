@@ -17,6 +17,7 @@
     "link:profile": "node scripts/link-profile-to-patient.mjs",
     "test:session-coach": "node --experimental-strip-types scripts/test-session-coach.mjs",
     "test:fit-session": "node --experimental-strip-types scripts/test-fit-session.mjs",
+    "test:public-origin": "node --experimental-strip-types scripts/test-public-origin.mjs",
     "test:healthcore-ai": "node --experimental-strip-types scripts/test-healthcore-ai.mjs",
     "test:clinical-progress": "node --experimental-strip-types scripts/test-clinical-progress.mjs",
     "test:clinical-prompt": "node --experimental-strip-types scripts/test-clinical-prompt.mjs",

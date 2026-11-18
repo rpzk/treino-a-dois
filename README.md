@@ -53,7 +53,7 @@ Sem login paralelo no FitCore. O paciente autenticado no portal HealthCore receb
 
 Resposta do exchange (contrato HealthCore): `{ patient_fhir_id, tenant_schema, fit_training_enabled }`. O perfil de treino resolve via `healthcore_patient_id` / Postgres `(tenant_schema, patient_fhir_id)`. Sem sessão → UI pede “abrir pelo portal”; APIs → 401.
 
-Env de produção (compose): `FITCORE_EXCHANGE_SECRET`, `FITCORE_SESSION_SECRET` (fallback no exchange), `FITCORE_PUBLIC_URL`, `HEALTHCORE_PUBLIC_URL`. **Sem `OPENAI_*` no FitCore.**
+Env de produção (compose): `FITCORE_EXCHANGE_SECRET`, `FITCORE_SESSION_SECRET` (fallback no exchange), `FITCORE_PUBLIC_URL`, `FITCORE_ALLOWED_ORIGINS` (opcional), `HEALTHCORE_PUBLIC_URL`. **Sem `OPENAI_*` no FitCore.**
 
 Teste: `pnpm run test:fit-session`.
 

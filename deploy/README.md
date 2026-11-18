@@ -74,7 +74,8 @@ Required env in `deploy/.env` (compose already wires them):
 |---|---|
 | `FITCORE_EXCHANGE_SECRET` | Shared with HealthCore (`X-FitCore-Exchange-Secret`) |
 | `FITCORE_SESSION_SECRET` | HMAC for `fitcore_session` cookie (defaults to exchange secret) |
-| `FITCORE_PUBLIC_URL` | `https://fit.rphealthtech.com` (HealthCore builds launch URLs with this) |
+| `FITCORE_PUBLIC_URL` | `https://fit.rphealthtech.com` (HealthCore builds launch URLs with this; also CSRF allowlist for `PUT /api/training`) |
+| `FITCORE_ALLOWED_ORIGINS` | Optional comma-separated extra public origins (no `*`); usually empty when only `FITCORE_PUBLIC_URL` is used |
 | `HEALTHCORE_PUBLIC_URL` | Default issuer, e.g. `https://rp.rphealthtech.com` |
 
 Flow: portal CTA → HealthCore `my-training/launch/` → browser `GET /auth/healthcore?code&issuer` → FitCore POSTs exchange → sets HttpOnly cookie → redirects `/`. Redeploy after env change:

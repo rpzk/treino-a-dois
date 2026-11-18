@@ -8,6 +8,7 @@ import {
   assertProfileAllowed,
   requireFitSession,
 } from "@/lib/require-fit-session";
+import { isAllowedRequestOrigin } from "@/lib/public-origin";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -39,10 +40,7 @@ export async function PUT(req: Request) {
   const auth = await requireFitSession(req);
   if (!auth.ok) return auth.response;
 
-  if (
-    req.headers.get("origin") &&
-    req.headers.get("origin") !== new URL(req.url).origin
-  ) {
+  if (!isAllowedRequestOrigin(req)) {
     return Response.json({ error: "Origem inválida." }, { status: 403 });
   }
 
