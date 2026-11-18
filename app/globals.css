@@ -177,9 +177,14 @@ button.portal-link:hover{background:#f5efe6}
 .equip-chip.removable{padding-right:4px}
 .equip-chip button{display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border:0;border-radius:999px;background:#f1ece2;color:#475569}
 .equip-empty{margin:0;color:#64748b;font-size:14px}
-.equip-picker{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;margin:16px 0;padding:28px 16px;border:2px dashed #d9cdb8;border-radius:1rem;background:#fdfbf7;color:#334155;font-weight:600;text-align:center;cursor:pointer;min-height:112px}
-.equip-picker.disabled{opacity:.5;cursor:not-allowed}
-.equip-picker input{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none}
+.equip-alert{margin:12px 0 0;padding:12px 14px;border:1px solid #fca5a5;background:#fef2f2;border-radius:10px;color:#7f1d1d;font-size:14px;line-height:1.45}
+.equip-hint{margin:0 0 12px;color:#64748b;font-size:13px;line-height:1.45;text-align:center}
+.equip-pickers{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:16px 0}
+.equip-pickers.disabled{opacity:.5}
+.equip-pickers.disabled .equip-picker{cursor:not-allowed}
+.equip-picker{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;padding:22px 12px;border:2px dashed #d9cdb8;border-radius:1rem;background:#fdfbf7;color:#334155;font-weight:600;text-align:center;cursor:pointer;min-height:104px}
+.equip-picker input{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer}
+.equip-pickers.disabled .equip-picker input{pointer-events:none}
 .equip-thumbs{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:16px}
 .equip-thumb{position:relative;aspect-ratio:4/3;border-radius:12px;overflow:hidden;border:1px solid #e8dfd1;background:#f1ece2}
 .equip-thumb img{width:100%;height:100%;object-fit:cover;display:block}
@@ -188,5 +193,6 @@ button.portal-link:hover{background:#f5efe6}
 .equip-add input{flex:1;min-width:0;padding:10px 12px;border:1px solid #e8dfd1;border-radius:10px;background:#fff;font-size:16px}
 .equip-actions{display:flex;flex-wrap:wrap;gap:10px;justify-content:flex-end}
 .equip-actions button,.equip-add button{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:44px}
-@media(max-width:640px){.equip-actions{flex-direction:column-reverse}.equip-actions button{width:100%}.equip-thumbs{grid-template-columns:repeat(2,1fr)}}
+.equip-dialog{padding-bottom:max(24px,env(safe-area-inset-bottom))!important;overscroll-behavior:contain;-webkit-overflow-scrolling:touch}
+@media(max-width:640px){.equip-actions{flex-direction:column-reverse}.equip-actions button{width:100%}.equip-thumbs{grid-template-columns:repeat(2,1fr)}.equip-pickers{grid-template-columns:1fr}.equip-dialog{max-height:min(88dvh,calc(100dvh - env(safe-area-inset-top) - 16px))!important}}
 .prescribed-badge{display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin:-8px 0 10px}.prescribed-badge .outline-tag{color:#236b4e;border-color:#bce3cf;background:#eff8f3;font-weight:600}.patient-edited{color:#475569;font-size:12px}

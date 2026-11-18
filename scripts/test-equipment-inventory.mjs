@@ -41,6 +41,23 @@ assert.equal(
   1,
 );
 
+// Route maps these exact messages to HTTP outcomes (empty → 200, invalid → 422).
+const { EMPTY_INVENTORY_MESSAGE, INVALID_JSON_MESSAGE } = await import(
+  "../lib/equipment-inventory.ts"
+);
+try {
+  parseEquipmentVision('{"items":[]}');
+  assert.fail("expected empty throw");
+} catch (error) {
+  assert.equal(error instanceof Error && error.message, EMPTY_INVENTORY_MESSAGE);
+}
+try {
+  parseEquipmentVision("not json");
+  assert.fail("expected invalid json throw");
+} catch (error) {
+  assert.equal(error instanceof Error && error.message, INVALID_JSON_MESSAGE);
+}
+
 assert.deepEqual(stateSchema.parse(blank), blank);
 const legacy = {
   workouts: [],
