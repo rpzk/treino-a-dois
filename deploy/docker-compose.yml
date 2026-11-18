@@ -14,6 +14,8 @@ services:
       # Postgres (shared HealthCore cluster). Host `db` resolves on healthcore_default.
       DATABASE_URL: ${DATABASE_URL:?set DATABASE_URL in deploy/.env}
       FITCORE_PUBLIC_URL: ${FITCORE_PUBLIC_URL:-https://fit.rphealthtech.com}
+      # Optional comma-separated extra browser origins for CSRF (no wildcards).
+      FITCORE_ALLOWED_ORIGINS: ${FITCORE_ALLOWED_ORIGINS:-}
       HEALTHCORE_PUBLIC_URL: ${HEALTHCORE_PUBLIC_URL:-https://rp.rphealthtech.com}
       FITCORE_EXCHANGE_SECRET: ${FITCORE_EXCHANGE_SECRET}
       FITCORE_SESSION_SECRET: ${FITCORE_SESSION_SECRET:-${FITCORE_EXCHANGE_SECRET}}
