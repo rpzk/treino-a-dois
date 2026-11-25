@@ -11,6 +11,7 @@ export type SessionCoachInput = {
   patientFhirId?: string;
   exerciseName: string;
   group?: string;
+  equipment?: string;
   sets: number;
   reps: number;
   rest: number;
@@ -105,6 +106,9 @@ export async function coachExercise(
         content: [
           `Exercício: ${name}`,
           input.group ? `Grupo: ${clampText(input.group, 40)}` : null,
+          input.equipment
+            ? `Equipamento/estação: ${clampText(input.equipment, 160)}`
+            : null,
           `Prescrição: ${input.sets}x${input.reps}, descanso ${input.rest}s`,
           typeof input.setIndex === "number"
             ? `Série atual (1-based): ${input.setIndex}`

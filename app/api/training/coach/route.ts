@@ -21,6 +21,7 @@ export async function POST(req: Request) {
   let body: {
     exerciseName?: string;
     group?: string;
+    equipment?: string;
     sets?: number;
     reps?: number;
     rest?: number;
@@ -47,6 +48,8 @@ export async function POST(req: Request) {
       clinicalContext,
       exerciseName,
       group: typeof body.group === "string" ? body.group : undefined,
+      equipment:
+        typeof body.equipment === "string" ? body.equipment : undefined,
       sets: Number(body.sets) || 3,
       reps: Number(body.reps) || 10,
       rest: Number(body.rest) || 90,

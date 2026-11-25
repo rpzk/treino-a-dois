@@ -82,4 +82,58 @@ assert.throws(
   /label/i,
 );
 
+// Rich multi-station equipment metadata round-trips and merges cleanly.
+const richVision = parseEquipmentVision(
+  JSON.stringify({
+    items: [
+      {
+        label: "Estação BodyCraft X4",
+        brand_model: "BodyCraft X4 (4-Stack Multi-Gym)",
+        stations: [
+          "Estação 1: Supino / Extensora / Flexora em pé",
+          "Estação 2: Puxador alto + braços de cabo",
+          "Estação 3: Leg press horizontal",
+          "Estação 4: Torre de polia vertical regulável",
+        ],
+        notes: "Estação compacta 4 torres de condomínio",
+      },
+      { label: "TRX" },
+    ],
+  }),
+);
+assert.equal(richVision.length, 2);
+assert.equal(richVision[0].brand_model, "BodyCraft X4 (4-Stack Multi-Gym)");
+assert.equal(richVision[0].stations.length, 4);
+
+const { isResearchableMachine, formatInventoryForPrompt } = await import(
+  "../lib/equipment-inventory.ts"
+);
+const { mergeResearchedEquipment } = await import(
+  "../lib/equipment-research.ts"
+);
+assert.equal(isResearchableMachine(richVision[0]), true);
+assert.equal(isResearchableMachine({ label: "Colchonete" }), false);
+
+const merged = mergeResearchedEquipment(richVision, [
+  {
+    label: "Estação BodyCraft X4",
+    brand_model: "BodyCraft X4",
+    researched_exercises: ["Leg press horizontal", "Puxada frontal", "Face pull"],
+  },
+]);
+assert.deepEqual(merged[0].researched_exercises, [
+  "Leg press horizontal",
+  "Puxada frontal",
+  "Face pull",
+]);
+assert.equal(merged[0].stations.length, 4);
+assert.match(formatInventoryForPrompt(merged), /BodyCraft X4/);
+assert.match(formatInventoryForPrompt(merged), /Leg press horizontal/);
+
+const withRichInv = {
+  ...legacy,
+  equipment_inventory: merged,
+};
+assert.deepEqual(stateSchema.parse(withRichInv), withRichInv);
+
 console.log("equipment-inventory checks passed");

@@ -163,15 +163,69 @@ assert.deepEqual(visionBody.images, [{ mime: "image/jpeg", data_base64: "abc" }]
 const suggestion = parseSuggestedWorkout(
   JSON.stringify({
     name: "Treino Full",
+    summary: "Treino adaptado para BodyCraft X4 e TRX.",
     items: [
-      { name: "Supino reto com barra", sets: 3, reps: 10, rest: 90 },
-      { name: "Remada curvada", sets: 3, reps: 10, rest: 90 },
-      { name: "Agachamento livre", sets: 3, reps: 8, rest: 120 },
-      { name: "Desenvolvimento com halteres", sets: 3, reps: 10, rest: 90 },
+      {
+        name: "Supino na máquina",
+        group: "Peito",
+        equipment: "BodyCraft X4 · Estação 1 (Press arm)",
+        instructions: "1. Ajuste o encosto.\n2. Empurre controlando.\n3. Expire ao empurrar.",
+        sets: 3,
+        reps: 10,
+        rest: 90,
+      },
+      {
+        name: "Remada invertida no TRX",
+        group: "Costas",
+        equipment: "Espaldar + TRX",
+        instructions: "1. Segure as alças.\n2. Puxe o peito em direção às mãos.",
+        sets: 3,
+        reps: 12,
+        rest: 75,
+      },
+      {
+        name: "Leg press horizontal",
+        group: "Pernas",
+        equipment: "BodyCraft X4 · Estação 3",
+        instructions: "1. Apoie os pés na plataforma.\n2. Empurre sem travar os joelhos.",
+        sets: 3,
+        reps: 12,
+        rest: 90,
+      },
+      {
+        name: "Rotação de tronco na polia",
+        group: "Abdômen",
+        equipment: "BodyCraft X4 · Estação 4 (Polia vertical)",
+        sets: 3,
+        reps: 12,
+        rest: 60,
+      },
     ],
   }),
 );
 assert.equal(suggestion.name, "Treino Full");
-assert.ok(suggestion.items.length >= 3);
+assert.equal(suggestion.summary, "Treino adaptado para BodyCraft X4 e TRX.");
+assert.equal(suggestion.items.length, 4);
+assert.equal(suggestion.items[1].name, "Remada invertida no TRX");
+assert.equal(suggestion.items[1].equipment, "Espaldar + TRX");
+assert.match(suggestion.items[0].instructions, /Ajuste o encosto/);
+
+const { parseSwappedExercise } = await import("../lib/workout-suggest.ts");
+const swapped = parseSwappedExercise(
+  JSON.stringify({
+    item: {
+      name: "Flexora em pé na estação",
+      group: "Pernas",
+      equipment: "BodyCraft X4 · Estação 1",
+      instructions: "1. Posicione o tornozelo no rolo.\n2. Flexione o joelho devagar.",
+      sets: 3,
+      reps: 12,
+      rest: 60,
+    },
+  }),
+);
+assert.equal(swapped.name, "Flexora em pé na estação");
+assert.equal(swapped.group, "Pernas");
+assert.equal(swapped.equipment, "BodyCraft X4 · Estação 1");
 
 console.log("healthcore-ai contract + suggest parse checks passed");

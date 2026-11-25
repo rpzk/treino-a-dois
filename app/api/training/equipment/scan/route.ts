@@ -9,15 +9,22 @@ import { requireFitSession } from "@/lib/require-fit-session";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const MAX_IMAGES = 4;
+const MAX_IMAGES = 8;
 const MAX_IMAGE_BYTES = 2 * 1024 * 1024; // decoded bytes per image
 const ALLOWED_MIMES = new Set(["image/jpeg", "image/png", "image/webp"]);
 const BASE64_RE = /^[A-Za-z0-9+/]+={0,2}$/;
 
 const VISION_SYSTEM =
-  "Você identifica equipamentos de academia em fotos. Responda somente com JSON válido, em português do Brasil, sem texto adicional.";
-const VISION_PROMPT =
-  'Analise as fotos e liste apenas equipamentos de academia visíveis (máquinas, halteres, barras, bancos, polias, anilhas, etc.). Ignore pessoas, objetos pessoais e itens que não sejam equipamento de treino. Responda no formato {"items":[{"label":"Nome curto do equipamento"}]} com nomes curtos e sem repetições.';
+  "Você é um especialista em equipamentos de musculação e academias compactas de condomínio. Analise todas as fotos em conjunto (múltiplos ângulos da mesma sala/máquina) e responda APENAS com JSON válido em português do Brasil, sem texto adicional.";
+const VISION_PROMPT = [
+  "Analise todas as fotos da academia e identifique todos os equipamentos de treino visíveis.",
+  "Atenção especial para estações compactas / multi-estações de condomínio:",
+  "1) Leia logotipos, etiquetas e placas de marca/modelo visíveis (ex.: BODYCRAFT, Movement, Technogym, Life Fitness, etc.) e registre em `brand_model` (ex.: \"BodyCraft X4\" quando houver 4 torres).",
+  "2) Agrupe vários ângulos da MESMA multi-estação em um único item principal, listando em `stations` cada estação/módulo visível (ex.: \"Press arm (supino/ombro)\", \"Cadeira extensora / flexora\", \"Puxador alto (lat pulldown)\", \"Braços articulados de cabo\", \"Leg press horizontal\", \"Torre de polia vertical regulável\").",
+  "3) Liste também equipamentos separados: espaldar, TRX/fita de suspensão, bola suíça, halteres, barras, anilhas, rack, banco, barra fixa, saco de pancada, steps, esteira, elíptico, bike de spinning, mini trampolim, colchonetes, etc.",
+  "4) Ignore pessoas, espelhos, ventiladores, paredes e objetos pessoais.",
+  'Responda exclusivamente no formato: {"items":[{"label":"Nome curto (máx 40 chars)","brand_model":"Marca e modelo se visível (opcional)","stations":["Módulo/estação 1","Módulo/estação 2"],"notes":"Detalhes curtos úteis para montar treino (opcional)"}]}',
+].join("\n");
 
 function decodedSize(base64: string): number {
   const padding = base64.endsWith("==") ? 2 : base64.endsWith("=") ? 1 : 0;

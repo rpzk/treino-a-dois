@@ -20,13 +20,27 @@ export async function POST(req: Request) {
   }
 
   let focus = "";
+  let level = "";
+  let durationMinutes: number | undefined;
+  let exclude: string[] = [];
   let equipmentInventory: ReturnType<typeof normalizeEquipmentItems> = [];
   try {
     const body = (await req.json()) as {
       focus?: string;
+      level?: string;
+      durationMinutes?: number;
+      exclude?: unknown;
       equipment_inventory?: unknown;
     };
     focus = typeof body.focus === "string" ? body.focus : "";
+    level = typeof body.level === "string" ? body.level : "";
+    durationMinutes =
+      typeof body.durationMinutes === "number"
+        ? body.durationMinutes
+        : undefined;
+    exclude = Array.isArray(body.exclude)
+      ? body.exclude.filter((x): x is string => typeof x === "string")
+      : [];
     equipmentInventory = normalizeEquipmentItems(body.equipment_inventory);
   } catch {
     focus = "";
@@ -40,6 +54,9 @@ export async function POST(req: Request) {
       patientFhirId: auth.ctx.session.patientFhirId,
       clinicalContext,
       focus,
+      level,
+      durationMinutes,
+      exclude,
       equipmentInventory,
     });
     return Response.json(suggestion, {
