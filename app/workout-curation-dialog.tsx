@@ -19,6 +19,7 @@ import {
 } from '@/components/ui/dialog';
 import { Checkbox } from '@/components/ui/checkbox';
 import { toast } from 'sonner';
+import ExerciseDemo from './exercise-demo';
 import type { EquipmentItem } from '@/lib/equipment-inventory';
 import type { SuggestedItem, SuggestedWorkout } from '@/lib/workout-suggest';
 import { estimateSeconds } from '@/lib/training-stats';
@@ -57,14 +58,6 @@ type Props = {
   friendlyHttpError: (status: number) => string;
   userFacingError: (e: unknown, fallback: string) => string;
 };
-
-function formatInstructionLines(instructions?: string): string[] {
-  if (!instructions) return [];
-  return instructions
-    .split(/\r?\n/)
-    .map((line) => line.trim())
-    .filter(Boolean);
-}
 
 export default function WorkoutCurationDialog(props: Props) {
   return (
@@ -416,7 +409,6 @@ function WorkoutCurationContent({
 
             <div className="curate-list">
               {items.map((item) => {
-                const lines = formatInstructionLines(item.instructions);
                 const guideOpen = !!expandedGuide[item.cid];
                 return (
                   <article
@@ -466,34 +458,33 @@ function WorkoutCurationContent({
                       )}
                     </div>
 
-                    {lines.length > 0 && (
-                      <div className="exec-guide">
-                        <button
-                          type="button"
-                          className="exec-guide-toggle"
-                          aria-expanded={guideOpen}
-                          onClick={() =>
-                            setExpandedGuide((prev) => ({
-                              ...prev,
-                              [item.cid]: !guideOpen,
-                            }))
-                          }
-                        >
-                          <span>Como executar</span>
-                          <ChevronDown
-                            size={16}
-                            className={guideOpen ? 'rotated' : ''}
-                          />
-                        </button>
-                        {guideOpen && (
-                          <div className="exec-guide-body">
-                            {lines.map((line, idx) => (
-                              <p key={idx}>{line}</p>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    )}
+                    <div className="exec-guide">
+                      <button
+                        type="button"
+                        className="exec-guide-toggle"
+                        aria-expanded={guideOpen}
+                        onClick={() =>
+                          setExpandedGuide((prev) => ({
+                            ...prev,
+                            [item.cid]: !guideOpen,
+                          }))
+                        }
+                      >
+                        <span>Como executar · demonstração e vídeo</span>
+                        <ChevronDown
+                          size={16}
+                          className={guideOpen ? 'rotated' : ''}
+                        />
+                      </button>
+                      {guideOpen && (
+                        <ExerciseDemo
+                          name={item.name}
+                          equipment={item.equipment}
+                          instructions={item.instructions}
+                          compact
+                        />
+                      )}
+                    </div>
                   </article>
                 );
               })}
