@@ -209,23 +209,22 @@ export default function TrainingApp(){
  function closeEquipWizard(){if(equipBusy)return;clearEquipPhotos();setEquipNew('');setEquipError('');setEquipStatus('');setEquipWizard('closed');}
  function openEquipWizard(initialStep:'capture'|'review'='capture'){clearEquipPhotos();setEquipDraft(data.equipment_inventory??[]);setEquipNew('');setEquipError('');setEquipStatus('');setEquipWizard(initialStep);}
  function pickEquipPhotos(files:FileList|null){
-  if(!files?.length)return;
+  // Snapshot FileList synchronously BEFORE caller resets e.target.value = '' (which empties the live FileList!).
+  const all=files?Array.from(files):[];
+  if(!all.length)return;
   setEquipError('');
-  setEquipPhotos(cur=>{
-   const room=EQUIP_MAX_PHOTOS-cur.length;
-   if(room<=0){toast.error(`Máximo de ${EQUIP_MAX_PHOTOS} fotos.`);return cur;}
-   const all=Array.from(files);
-   if(all.length>room)toast.error(`Máximo de ${EQUIP_MAX_PHOTOS} fotos.`);
-   const heic=all.filter(isHeicLike);
-   if(heic.length)toast.error('Fotos HEIC/HEIF não são suportadas. Use JPEG/PNG ou a câmera do app.');
-   const candidates=all.filter(f=>isLikelyImageFile(f)&&!isHeicLike(f));
-   const skipped=all.length-candidates.length-heic.length;
-   if(skipped>0)toast.error('Algumas fotos foram ignoradas (formato não suportado).');
-   const picked=candidates.slice(0,Math.max(0,room));
-   if(!picked.length)return cur;
-   const added=picked.map(file=>{const url=URL.createObjectURL(file);equipUrls.current.push(url);return {id:uid(),file,url};});
-   return [...cur,...added];
-  });
+  const room=EQUIP_MAX_PHOTOS-equipPhotos.length;
+  if(room<=0){toast.error(`Máximo de ${EQUIP_MAX_PHOTOS} fotos.`);return;}
+  if(all.length>room)toast.error(`Máximo de ${EQUIP_MAX_PHOTOS} fotos (selecionadas as primeiras ${room}).`);
+  const heic=all.filter(isHeicLike);
+  if(heic.length)toast.error('Fotos HEIC/HEIF não são suportadas. Use JPEG/PNG ou a câmera do app.');
+  const candidates=all.filter(f=>isLikelyImageFile(f)&&!isHeicLike(f));
+  const skipped=all.length-candidates.length-heic.length;
+  if(skipped>0)toast.error('Algumas fotos foram ignoradas (formato não suportado).');
+  const picked=candidates.slice(0,Math.max(0,room));
+  if(!picked.length)return;
+  const added=picked.map(file=>{const url=URL.createObjectURL(file);equipUrls.current.push(url);return {id:uid(),file,url};});
+  setEquipPhotos(cur=>[...cur,...added].slice(0,EQUIP_MAX_PHOTOS));
  }
  function removeEquipPhoto(id:string){setEquipPhotos(cur=>{const ph=cur.find(x=>x.id===id);if(ph){URL.revokeObjectURL(ph.url);equipUrls.current=equipUrls.current.filter(u=>u!==ph.url);}return cur.filter(x=>x.id!==id);});}
  async function researchEquipment(targetItems:EquipmentItem[],quiet=false):Promise<EquipmentItem[]>{
